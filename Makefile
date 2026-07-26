@@ -18,7 +18,7 @@ CONTENTS   := $(APP)/Contents
 # Everything swift-format and the compiler should look at.
 SWIFT_SOURCES := Sources Tests Package.swift
 
-.PHONY: all app build run test check fmt lint clean install uninstall
+.PHONY: all app build run test check arch fmt lint clean install uninstall
 
 all: app
 
@@ -55,9 +55,22 @@ test:
 ##
 ## This is what CI runs and what to run before committing. Warnings are errors here on purpose:
 ## a warning nobody fixes is just a lie about the state of the code.
-check: lint
+check: lint arch
 	swift build -c debug -Xswiftc -warnings-as-errors
 	swift test
+
+## arch — enforce that PerchCore stays free of UI frameworks.
+##
+## PerchCore is pure logic so geometry, config, and state can be tested without a display. One
+## stray `import AppKit` quietly ends that, and the cost only shows up much later when the tests
+## need a window server. Cheaper to catch here.
+arch:
+	@if grep -rn --include='*.swift' \
+	    -E '^[[:space:]]*import[[:space:]]+(AppKit|SwiftUI|Cocoa)' Sources/PerchCore; then \
+	    echo "error: PerchCore must not import UI frameworks — see CLAUDE.md"; \
+	    exit 1; \
+	fi
+	@echo "arch: PerchCore is UI-free"
 
 ## fmt — reformat sources in place.
 fmt:
