@@ -33,6 +33,13 @@ public final class MediaWidget: NotchWidget {
     /// Decoded album art for `playing`, once it has been prepared off the main thread.
     fileprivate private(set) var artwork: NSImage?
 
+    /// The track as it was when the current announcement started.
+    ///
+    /// A track change arrives as several updates in quick succession — title first, then artwork,
+    /// then position — and rendering each one repaints the announcement while it is being read.
+    /// Freezing it means a peek says one thing for its whole duration.
+    fileprivate private(set) var peekSnapshot: NowPlaying?
+
     public init(settings: WidgetSettings) throws {
         placement = try settings.enumeration("placement", default: .expanded)
         showsArtwork = try settings.bool("artwork", default: true)
@@ -125,6 +132,7 @@ public final class MediaWidget: NotchWidget {
         // Do not peek at whatever happened to be playing when perch launched — that is not news,
         // and announcing it on every start would be obnoxious.
         guard !isFirstTrackSeen, previous != nil else { return }
+        peekSnapshot = current
         attention?.requestPeek()
     }
 
@@ -249,22 +257,31 @@ private struct MediaPeekView: View {
     let artworkSize: CGFloat
 
     var body: some View {
-        HStack(spacing: 10) {
-            if showsArtwork, let artwork = widget.artwork {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .frame(width: artworkSize, height: artworkSize)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        let track = widget.peekSnapshot ?? widget.playing
+
+        return HStack(spacing: 10) {
+            if showsArtwork {
+                // The space is reserved whether or not the image has decoded yet. Showing nothing
+                // and then inserting it shoves the text sideways mid-announcement.
+                Group {
+                    if let artwork = widget.artwork {
+                        Image(nsImage: artwork).resizable()
+                    } else {
+                        RoundedRectangle(cornerRadius: 5).fill(.white.opacity(0.08))
+                    }
+                }
+                .frame(width: artworkSize, height: artworkSize)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(widget.playing?.title ?? "")
+                Text(track?.title ?? "")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .accessibilityIdentifier("media.peek.title")
 
-                if let artist = widget.playing?.artist, !artist.isEmpty {
+                if let artist = track?.artist, !artist.isEmpty {
                     Text(artist)
                         .font(.system(size: 10))
                         .foregroundStyle(.white.opacity(0.6))

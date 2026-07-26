@@ -478,15 +478,43 @@ scenario(
 
         // Poll rather than sleeping a fixed time: the peek is short, and a fixed wait would race
         // it in one direction or the other.
+        // Poll tightly. Sampling only after a coarse detection loop misses the first moments,
+        // which is exactly when a late-arriving image or metadata field rearranges things.
         var sawPeek = false
-        for _ in 0..<25 {
-            wait(0.2)
-            if element(withIdentifier: "media.peek.title", in: app) != nil {
+        var frames: [(x: CGFloat, y: CGFloat, text: String)] = []
+        for _ in 0..<200 {
+            if let title = element(withIdentifier: "media.peek.title", in: app) {
                 sawPeek = true
-                break
+                if let bounds = screenFrame(of: title) {
+                    frames.append((bounds.minX, bounds.minY, value(title) ?? ""))
+                }
+                if frames.count >= 20 { break }
+            } else if sawPeek {
+                break  // The peek ended.
             }
+            wait(0.03)
         }
         check(sawPeek, "skipping a track makes the notch announce it")
+
+        // An announcement that rearranges itself while you are reading it is worse than none.
+        if sawPeek, frames.count >= 3 {
+            let horizontal = (frames.map(\.x).max() ?? 0) - (frames.map(\.x).min() ?? 0)
+            let vertical = (frames.map(\.y).max() ?? 0) - (frames.map(\.y).min() ?? 0)
+            check(
+                horizontal < 1,
+                "the announcement does not shift sideways (moved \(horizontal)pt)"
+            )
+            check(
+                vertical < 1,
+                "the announcement does not shift vertically (moved \(vertical)pt)"
+            )
+            check(
+                Set(frames.map(\.text)).count <= 1,
+                "the announcement's text does not change while it is up"
+            )
+        } else if sawPeek {
+            check(false, "could not sample the announcement often enough to judge it")
+        }
 
         var reverted = false
         for _ in 0..<30 {

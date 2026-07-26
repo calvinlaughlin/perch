@@ -17,16 +17,22 @@ struct NotchContentView: View {
             // exactly the bug that meant strip widgets never appeared at all.
             collapsedStrip
                 .opacity(model.isOpen ? 0 : 1)
+                .animation(nil, value: model.state)
 
             // A peek shows the same widgets in a compact form: it is an announcement, so it
             // carries what changed and not the controls you would only want if you had asked.
+            // Switched instantly, not faded. Text drawn at fractional opacity changes
+            // antialiasing — subpixel to grayscale and back — which reads as the words shifting
+            // and thickening while you are trying to read them. The shape still animates, and its
+            // clip is what reveals the content, so the panel remains one surface arriving rather
+            // than a background followed by its contents.
             peekContent
                 .opacity(model.isPeeking ? 1 : 0)
+                .animation(nil, value: model.state)
 
             expandedContent
-                // Fades on the same spring as the shape, so the open panel reads as one surface
-                // arriving rather than a background followed by its contents.
                 .opacity(model.state == .expanded ? 1 : 0)
+                .animation(nil, value: model.state)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
