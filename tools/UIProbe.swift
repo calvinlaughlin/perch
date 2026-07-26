@@ -187,6 +187,7 @@ func playbackIsPlaying() -> Bool? {
 
 var failures: [String] = []
 var currentScenario = ""
+var skippedScenarios = 0
 
 func check(_ condition: Bool, _ description: String) {
     print("  \(condition ? "ok  " : "FAIL") \(description)")
@@ -197,7 +198,29 @@ func check(_ condition: Bool, _ description: String) {
 ///
 /// Config goes in a throwaway `XDG_CONFIG_HOME`, so scenarios cannot disturb the real one and
 /// each starts from a known state rather than from whatever the machine happens to have.
-func scenario(_ name: String, config: String, _ body: (AXUIElement) -> Void) {
+/// Whether the invasive scenarios run.
+///
+/// They take the pointer for the best part of a minute and change what is playing, which is
+/// intolerable to run while someone is using the machine. Off unless asked for.
+let drivesInput = ProcessInfo.processInfo.environment["FULL"] == "1"
+
+/// How a scenario interacts with the machine.
+enum Interaction {
+    /// Reads the accessibility tree. Touches nothing.
+    case passive
+    /// Moves the pointer, clicks, or changes playback.
+    case driving
+}
+
+func scenario(
+    _ name: String, interaction: Interaction = .passive, config: String,
+    _ body: (AXUIElement) -> Void
+) {
+    if case .driving = interaction, !drivesInput {
+        print("\n\(name.uppercased())\n  skipped — needs the pointer; run `make ui-probe FULL=1`")
+        skippedScenarios += 1
+        return
+    }
     currentScenario = name
     print("\n\(name.uppercased())")
 
@@ -268,6 +291,7 @@ func panelIsOpen(_ app: AXUIElement) -> Bool {
 
 scenario(
     "media widget",
+    interaction: .driving,
     config: """
         open-on = hover
         widget = media
@@ -334,6 +358,7 @@ scenario(
 
 scenario(
     "open-on = click",
+    interaction: .driving,
     config: """
         open-on = click
         widget = media
@@ -355,6 +380,7 @@ scenario(
 
 scenario(
     "open-on = never",
+    interaction: .driving,
     config: """
         open-on = never
         widget = media
@@ -458,6 +484,7 @@ if NSScreen.screens.count > 1,
 
 scenario(
     "peek on track change",
+    interaction: .driving,
     config: """
         open-on = never
         peek-duration = 2s
@@ -539,6 +566,7 @@ scenario(
 
 scenario(
     "notch menu",
+    interaction: .driving,
     config: """
         open-on = hover
         widget = media
@@ -619,7 +647,10 @@ movePointer(to: originalPointer)
 
 print("")
 if failures.isEmpty {
-    print("PASS — every scenario behaved as configured")
+    let note = skippedScenarios > 0
+        ? " (\(skippedScenarios) interactive scenario(s) skipped — run with FULL=1)"
+        : ""
+    print("PASS — every scenario behaved as configured\(note)")
     exit(0)
 }
 print("FAIL — \(failures.count) check(s) failed:")

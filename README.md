@@ -96,7 +96,7 @@ Working and in daily use, but early. Known gaps:
 make check       # lint + build with warnings-as-errors + tests. What CI runs.
 make run         # build and launch with logs on stdout
 make probe       # verify drawn geometry against the real camera housing
-make ui-probe    # drive the interface through the accessibility tree
+make ui-probe    # inspect the interface through the accessibility tree
 ```
 
 Architecture, the AppKit traps this app is built on top of, and how verification works:

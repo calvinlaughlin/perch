@@ -32,11 +32,15 @@ perch has three layers, because unit tests structurally cannot reach where its b
 |---|---|---|
 | `make test` | Geometry, config parsing, state machine, stream decoding | yes |
 | `make probe` | What is actually drawn, measured against the real camera housing | no |
-| `make ui-probe` | Whether the interface works, driven through the accessibility tree | no |
+| `make ui-probe` | The interface, read through the accessibility tree | no |
+| `make ui-probe FULL=1` | The same, plus pressing real controls and checking playback changes | no |
 
-The probes need a notched display, Screen Recording and Accessibility permission, and something
-playing — none of which a CI runner has. **`make ui-probe` takes over your mouse for about 40
-seconds**; do not run it mid-work.
+The probes need a notched display and granted permissions, which a CI runner has neither of.
+
+`make ui-probe` reads only, so it is safe to run while you work. **`FULL=1` takes over the pointer
+for about 40 seconds and skips a track** — that is where controls get pressed and playback is
+checked for an actual change, which is the class of bug a screenshot cannot reveal. Opt-in for
+obvious reasons.
 
 ### Rules that were learned the hard way
 
@@ -59,6 +63,20 @@ probe.
 
 **Every check must be shown to fail.** After writing an assertion, reintroduce the bug and confirm
 it goes red. An assertion that cannot fail manufactures confidence.
+
+### Measuring against real hardware
+
+Two rules that cost real time to learn:
+
+**Capture origins must be whole points.** `screencapture -R` floors fractional coordinates, so a
+fractional origin offsets every measurement by half a point — which reads as a bug in perch when it
+is a bug in the ruler. This happened twice; treat a probe failure as "one of these two things is
+wrong", not "the app is wrong".
+
+**Fixtures come from `NSScreen`, not spec sheets.** The 16-inch camera housing is 185x32pt with
+auxiliary areas a point apart, not the 220x38 the internet claims. That asymmetry puts the housing
+centre on a half point, which is exactly the case that exposes alignment bugs — a tidied-up fixture
+hides them.
 
 ### What the probes cannot see
 

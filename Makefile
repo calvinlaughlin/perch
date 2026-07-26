@@ -142,16 +142,20 @@ check: lint arch
 probe: app
 	@swift tools/NotchProbe.swift "$(CONTENTS)/MacOS/$(NAME)"
 
-## ui-probe — verify the interface by driving it through the accessibility tree.
+## ui-probe — verify the interface through the accessibility tree.
 ##
-## Complements `probe`, which measures geometry in pixels. This one asserts on structure and
-## behaviour: that controls exist, that pressing them changes real playback state, and that the
-## panel survives being used. A dead button cannot be pressed, so it fails here by construction —
-## which is precisely the class of bug a screenshot cannot reveal.
+## Complements `probe`, which measures geometry in pixels. This one asserts on structure: that
+## widgets render, that they land on the right display, that a bad config does not take the app
+## down. It reads only, so it is safe to run while you are working.
 ##
-## Local only: needs a notched display, Accessibility permission, and something playing.
+## `make ui-probe FULL=1` adds the scenarios that press real controls and check playback actually
+## changes — the class of bug a screenshot cannot reveal. Those take the pointer for about a
+## minute and skip a track, so they are opt-in.
+##
+## Local only: needs a notched display and Accessibility permission. FULL=1 also needs something
+## playing.
 ui-probe: app
-	@swift tools/UIProbe.swift "$(CONTENTS)/MacOS/$(NAME)"
+	@FULL=$(FULL) swift tools/UIProbe.swift "$(CONTENTS)/MacOS/$(NAME)"
 
 ## arch — enforce that PerchCore stays free of UI frameworks.
 ##
