@@ -48,6 +48,23 @@ an afternoon.
 
 ## Verifying notch geometry
 
+**Run `make probe` after touching geometry, the panel, or the shape.** It launches perch, reads the
+camera housing from `NSScreen`, screenshots the region, and reports where the drawn shape actually
+lands, row by row. It fails if anything spills past the housing onto the menu bar.
+
+This exists because unit tests structurally cannot catch this class of bug. `NotchMetrics` can
+compute perfect numbers and AppKit will still round the window origin to a whole point, apply a
+safe-area inset, or resize the window to SwiftUI's ideal size — silently, with every test green.
+Two real bugs shipped that way: a half-point leftward shift from a fractional window origin, and
+shoulders painting black wedges on the menu bar beside the notch.
+
+The invariant the probe checks is one-sided on purpose. A row *narrower* than the housing is fine
+— the housing is opaque, so anything inside it is invisible, which is what the collapsed shape's
+bottom corner rounding looks like from the outside. A row *wider* than the housing is a defect by
+construction, because those pixels land where the user can see them.
+
+### Doing it by hand
+
 The notch is a **physical mask, not a framebuffer feature**: screenshots capture those pixels as
 ordinary content. So `screencapture` plus pixel sampling is a reliable way to check placement
 against real hardware.

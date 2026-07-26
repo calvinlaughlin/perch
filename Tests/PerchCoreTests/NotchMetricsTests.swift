@@ -3,12 +3,18 @@ import Testing
 
 @testable import PerchCore
 
-/// A 16" MacBook Pro: 3456x2234 backing pixels at 2x, 220x38pt camera housing.
+/// A 16" MacBook Pro, measured from real hardware via `NSScreen` rather than taken from spec
+/// sheets: 1728x1117pt at 2x, with a 185x32pt camera housing whose auxiliary areas are one point
+/// different in width.
+///
+/// The asymmetry is not a rounding artefact in the fixture — the display genuinely reports 771 and
+/// 772 — and it puts the housing centre on a half point, which is precisely the case that exposes
+/// alignment bugs. A tidied-up fixture would hide them.
 private let macBookPro16 = ScreenGeometry(
     frame: CGRect(x: 0, y: 0, width: 1728, height: 1117),
-    safeAreaTopInset: 38,
-    auxiliaryTopLeftWidth: 754,
-    auxiliaryTopRightWidth: 754,
+    safeAreaTopInset: 32,
+    auxiliaryTopLeftWidth: 771,
+    auxiliaryTopRightWidth: 772,
     backingScaleFactor: 2
 )
 
@@ -50,8 +56,8 @@ struct HardwareNotchLayoutTests {
         let layout = NotchMetrics.resolve(for: macBookPro16)
 
         #expect(layout.kind == .hardware)
-        #expect(layout.collapsedRect.width == 220)  // 1728 - 754 - 754
-        #expect(layout.collapsedRect.height == 38)
+        #expect(layout.collapsedRect.width == 185)  // 1728 - 771 - 772
+        #expect(layout.collapsedRect.height == 32)
         #expect(layout.collapsedRect.minY == 0)
     }
 
@@ -78,9 +84,12 @@ struct HardwareNotchLayoutTests {
 
     @Test("Both shapes share a horizontal centre, so the notch grows in place")
     func shapesAreConcentric() {
+        // Any drift here makes the notch slide sideways as it opens.
         let layout = NotchMetrics.resolve(for: macBookPro16)
+        let tolerance = 0.5 / layout.scale
 
-        #expect(abs(layout.collapsedRect.midX - layout.expandedRect.midX) < 0.5)
+        #expect(abs(layout.collapsedRect.midX - layout.expandedRect.midX) <= tolerance)
+        #expect(abs(layout.hardwareRect.midX - layout.expandedRect.midX) <= tolerance)
     }
 
     @Test("Side bleed widens the collapsed shape symmetrically")
@@ -186,6 +195,167 @@ struct NotchLayoutEdgeCaseTests {
             options: NotchGeometryOptions(expandedHeight: -100)
         )
 
-        #expect(layout.panelRect.height == 38)
+        #expect(layout.panelRect.height == 32)
+    }
+}
+
+@Suite("Pixel alignment against real hardware")
+struct PixelAlignmentTests {
+
+    /// A spread of plausible display shapes, including ones that put the panel origin on a
+    /// fraction — which is exactly where alignment bugs hide.
+    private static let displays: [(name: String, screen: ScreenGeometry)] = [
+        ("16-inch", macBookPro16),
+        (
+            "14-inch",
+            ScreenGeometry(
+                frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                safeAreaTopInset: 32,
+                auxiliaryTopLeftWidth: 663,
+                auxiliaryTopRightWidth: 663,
+                backingScaleFactor: 2
+            )
+        ),
+        (
+            "odd width, asymmetric housing",
+            ScreenGeometry(
+                frame: CGRect(x: 0, y: 0, width: 1727, height: 1117),
+                safeAreaTopInset: 32,
+                auxiliaryTopLeftWidth: 770.5,
+                auxiliaryTopRightWidth: 771.5,
+                backingScaleFactor: 2
+            )
+        ),
+        (
+            "non-zero display origin",
+            ScreenGeometry(
+                frame: CGRect(x: -1728, y: 233, width: 1728, height: 1117),
+                safeAreaTopInset: 32,
+                auxiliaryTopLeftWidth: 771,
+                auxiliaryTopRightWidth: 772,
+                backingScaleFactor: 2
+            )
+        ),
+        (
+            "1x display",
+            ScreenGeometry(
+                frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+                safeAreaTopInset: 24,
+                auxiliaryTopLeftWidth: 627,
+                auxiliaryTopRightWidth: 628,
+                backingScaleFactor: 1
+            )
+        ),
+    ]
+
+    @Test("The panel origin lands on whole points")
+    func panelOriginIsIntegral() {
+        // AppKit rounds window origins to integers. A fractional origin is silently discarded and
+        // every shape inside inherits the difference as a shift against the hardware.
+        for (name, screen) in Self.displays {
+            let panel = NotchMetrics.resolve(for: screen).panelRect
+            #expect(
+                panel.minX == panel.minX.rounded(),
+                "\(name): panel x \(panel.minX) is not a whole point"
+            )
+            #expect(
+                panel.minY == panel.minY.rounded(),
+                "\(name): panel y \(panel.minY) is not a whole point"
+            )
+        }
+    }
+
+    @Test("The collapsed shape lands on the camera housing in global coordinates")
+    func collapsedShapeLandsOnHousing() {
+        // The invariant that actually matters: not what the local rect says, but where the shape
+        // ends up on screen once the panel origin is applied.
+        for (name, screen) in Self.displays {
+            let layout = NotchMetrics.resolve(for: screen)
+            let tolerance = 0.5 / layout.scale  // half a backing pixel; below this nothing renders
+
+            let expectedLeft = screen.frame.minX + screen.auxiliaryTopLeftWidth
+            let expectedRight = screen.frame.maxX - screen.auxiliaryTopRightWidth
+
+            let actualLeft = layout.panelRect.minX + layout.collapsedRect.minX
+            let actualRight = layout.panelRect.minX + layout.collapsedRect.maxX
+
+            #expect(
+                abs(actualLeft - expectedLeft) <= tolerance,
+                "\(name): left edge at \(actualLeft), housing starts at \(expectedLeft)"
+            )
+            #expect(
+                abs(actualRight - expectedRight) <= tolerance,
+                "\(name): right edge at \(actualRight), housing ends at \(expectedRight)"
+            )
+        }
+    }
+
+    @Test("Every rendered length is a whole number of backing pixels")
+    func lengthsArePixelAligned() {
+        for (name, screen) in Self.displays {
+            let layout = NotchMetrics.resolve(for: screen)
+            let lengths: [(String, CGFloat)] = [
+                ("collapsed.x", layout.collapsedRect.minX),
+                ("collapsed.width", layout.collapsedRect.width),
+                ("collapsed.height", layout.collapsedRect.height),
+                ("expanded.x", layout.expandedRect.minX),
+                ("expanded.width", layout.expandedRect.width),
+            ]
+            for (label, value) in lengths {
+                let pixels = value * layout.scale
+                #expect(
+                    abs(pixels - pixels.rounded()) < 0.001,
+                    "\(name): \(label) = \(value)pt is not a whole backing pixel"
+                )
+            }
+        }
+    }
+
+    @Test("The hardware rect matches the camera housing regardless of bleed")
+    func hardwareRectIgnoresBleed() {
+        let plain = NotchMetrics.resolve(for: macBookPro16)
+        let bled = NotchMetrics.resolve(
+            for: macBookPro16,
+            options: NotchGeometryOptions(collapsedSideBleed: 40)
+        )
+
+        #expect(plain.hardwareRect.width == bled.hardwareRect.width)
+        #expect(bled.collapsedRect.width == bled.hardwareRect.width + 80)
+    }
+}
+
+@Suite("Shoulder suppression")
+struct ShoulderSuppressionTests {
+    @Test("A collapsed shape with no bleed is reported as tracing hardware")
+    func collapsedTracesHardware() {
+        // Shoulders on this shape would be its only visible part: black wedges on the menu bar.
+        let layout = NotchMetrics.resolve(for: macBookPro16)
+
+        #expect(layout.tracesHardware(layout.collapsedRect))
+    }
+
+    @Test("An expanded shape is not reported as tracing hardware")
+    func expandedDoesNotTraceHardware() {
+        let layout = NotchMetrics.resolve(for: macBookPro16)
+
+        #expect(!layout.tracesHardware(layout.expandedRect))
+    }
+
+    @Test("Bleed makes the collapsed shape stop tracing hardware")
+    func bleedStopsTracingHardware() {
+        let layout = NotchMetrics.resolve(
+            for: macBookPro16,
+            options: NotchGeometryOptions(collapsedSideBleed: 40)
+        )
+
+        #expect(!layout.tracesHardware(layout.collapsedRect))
+    }
+
+    @Test("A synthetic pill never counts as tracing hardware")
+    func syntheticNeverTracesHardware() {
+        // There is no housing to hide behind, so the shoulders are the blend into the top edge.
+        let layout = NotchMetrics.resolve(for: externalDisplay)
+
+        #expect(!layout.tracesHardware(layout.collapsedRect))
     }
 }

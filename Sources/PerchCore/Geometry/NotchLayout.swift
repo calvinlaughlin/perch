@@ -30,6 +30,14 @@ public struct NotchLayout: Equatable, Sendable {
     /// The expanded shape, in `panelRect`-local coordinates (origin top-left, y down).
     public var expandedRect: CGRect
 
+    /// The physical camera housing, in `panelRect`-local coordinates.
+    ///
+    /// Equals `collapsedRect` when `collapsed-bleed` is zero. Views compare the shape they are
+    /// about to draw against this to tell whether it is tracing hardware — a shape that exactly
+    /// covers the housing must not draw shoulders, because there is nothing to blend into and
+    /// they would just paint onto the menu bar either side of the notch.
+    public var hardwareRect: CGRect
+
     /// Backing scale of the display this layout was resolved for.
     public var scale: CGFloat
 
@@ -38,13 +46,20 @@ public struct NotchLayout: Equatable, Sendable {
         panelRect: CGRect,
         collapsedRect: CGRect,
         expandedRect: CGRect,
+        hardwareRect: CGRect,
         scale: CGFloat
     ) {
         self.kind = kind
         self.panelRect = panelRect
         self.collapsedRect = collapsedRect
         self.expandedRect = expandedRect
+        self.hardwareRect = hardwareRect
         self.scale = scale
+    }
+
+    /// Whether `rect` covers the camera housing exactly, so shoulders would spill onto the menu bar.
+    public func tracesHardware(_ rect: CGRect) -> Bool {
+        kind == .hardware && abs(rect.width - hardwareRect.width) < 0.5
     }
 }
 

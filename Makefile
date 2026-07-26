@@ -18,7 +18,7 @@ CONTENTS   := $(APP)/Contents
 # Everything swift-format and the compiler should look at.
 SWIFT_SOURCES := Sources Tests Package.swift
 
-.PHONY: all app build run test check arch fmt lint clean install uninstall
+.PHONY: all app build run test check arch probe fmt lint clean install uninstall
 
 all: app
 
@@ -58,6 +58,21 @@ test:
 check: lint arch
 	swift build -c debug -Xswiftc -warnings-as-errors
 	swift test
+
+## probe — measure what perch actually draws against the real camera housing.
+##
+## Not part of `check`: it needs a notched display, a granted Screen Recording permission, and an
+## undisturbed pointer, none of which exist on CI. Run it after touching geometry, the panel, or
+## the shape — the failures it catches are the ones unit tests structurally cannot see, because
+## they happen after AppKit gets hold of our numbers.
+probe: app
+	@pkill -x $(NAME) 2>/dev/null || true
+	@"$(CONTENTS)/MacOS/$(NAME)" >/dev/null 2>&1 & \
+	  sleep 2; \
+	  swift tools/NotchProbe.swift; \
+	  status=$$?; \
+	  pkill -x $(NAME) 2>/dev/null || true; \
+	  exit $$status
 
 ## arch — enforce that PerchCore stays free of UI frameworks.
 ##

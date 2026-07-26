@@ -43,6 +43,13 @@ public struct Config: Equatable, Sendable {
     /// Corner radius of the expanded panel's bottom corners, in points.
     public var cornerRadius: CGFloat = 24
 
+    /// Radius of the concave shoulders where the shape meets the top of the display, in points.
+    ///
+    /// Makes an open panel look carved out of the bezel rather than pasted onto it. Suppressed
+    /// automatically when the shape is tracing the camera housing exactly — there the shoulders
+    /// would have nothing to blend into and would just paint onto the menu bar beside the notch.
+    public var shoulderRadius: CGFloat = 10
+
     /// Corner radius of the collapsed shape's bottom corners, in points.
     ///
     /// Defaults to roughly the curvature of the physical camera housing, so the collapsed state

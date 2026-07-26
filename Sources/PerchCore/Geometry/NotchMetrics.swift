@@ -46,8 +46,17 @@ public enum NotchMetrics {
         // --- The fixed window canvas ---------------------------------------------------------
         // Wide enough for whichever shape is larger, never wider than the display, and pinned
         // flush to the top edge. This frame does not change as the notch animates.
+        //
+        // The extra slack matters: the window origin has to be a whole point, but a camera housing
+        // centred on a half point (185pt wide starting at 771) does not. Without room to spare, a
+        // shape centred on the housing would sit half a point outside the canvas and get clipped.
+        // A point of margin each side lets every shape be positioned on the hardware exactly.
+        let canvasSlack: CGFloat = 1
         let expandedWidth = min(options.expandedWidth, screen.frame.width)
-        let panelWidth = min(max(expandedWidth, collapsedWidth), screen.frame.width)
+        let panelWidth = min(
+            max(expandedWidth, collapsedWidth) + canvasSlack * 2,
+            screen.frame.width
+        )
         let panelHeight = notchSize.height + max(0, options.expandedHeight)
 
         // Centre the canvas on the notch, then nudge it back inside the display if that pushed it
@@ -59,38 +68,49 @@ public enum NotchMetrics {
             screen.frame.maxX - panelWidth
         )
 
-        let panelRect = align(
-            CGRect(
-                x: panelMinX,
-                y: screen.frame.maxY - panelHeight,  // AppKit: y grows upward, so top edge is maxY
-                width: panelWidth,
-                height: panelHeight
-            ),
-            scale: scale
+        // The window origin must land on whole points, not merely whole backing pixels. AppKit
+        // rounds window origins to integers, so an x of 653.5 silently becomes 653.0 and every
+        // shape inside inherits a half-point leftward shift against the hardware it is tracing.
+        // Rounding here — and then measuring the local rects against the *rounded* origin — keeps
+        // what we compute and what the window server does in agreement.
+        let panelRect = CGRect(
+            x: panelMinX.rounded(),
+            // AppKit: y grows upward, so the top edge of the display is maxY.
+            y: (screen.frame.maxY - panelHeight).rounded(),
+            width: snap(panelWidth, scale: scale),
+            height: snap(panelHeight, scale: scale)
         )
 
         // --- Shapes, converted into the panel's local top-left-origin space -------------------
         // Views consume these, and SwiftUI's y axis points down, so both shapes hang from y = 0.
-        let collapsedRect = align(
-            CGRect(
-                x: collapsedMinX - panelRect.minX,
-                y: 0,
-                width: collapsedWidth,
-                height: notchSize.height
-            ),
-            scale: scale
+        // Offsets are relative to the rounded panel origin, so any rounding applied above is
+        // absorbed here rather than displacing the shape.
+        let collapsedRect = CGRect(
+            x: snap(collapsedMinX - panelRect.minX, scale: scale),
+            y: 0,
+            width: snap(collapsedWidth, scale: scale),
+            height: snap(notchSize.height, scale: scale)
         )
 
-        // Expanded is centred in the canvas and spans the full canvas height: it covers the notch
-        // and continues below it, which is what makes the shape read as "growing out of" the notch.
-        let expandedRect = align(
-            CGRect(
-                x: (panelRect.width - expandedWidth) / 2,
-                y: 0,
-                width: expandedWidth,
-                height: panelRect.height
-            ),
-            scale: scale
+        // The physical housing, independent of any bleed. Views compare the shape they are about
+        // to draw against this to decide whether it is tracing hardware.
+        let hardwareRect = CGRect(
+            x: snap(notchMinX - panelRect.minX, scale: scale),
+            y: 0,
+            width: snap(notchSize.width, scale: scale),
+            height: snap(notchSize.height, scale: scale)
+        )
+
+        // Expanded is centred on the *housing*, not on the canvas, and spans the full canvas
+        // height: it covers the notch and continues below it, which is what makes the shape read
+        // as "growing out of" the notch. Centring on the canvas instead would put the two shapes
+        // half a point apart whenever the housing centre is not a whole point, and the notch would
+        // visibly slide sideways as it opened.
+        let expandedRect = CGRect(
+            x: snap(notchCentreX - expandedWidth / 2 - panelRect.minX, scale: scale),
+            y: 0,
+            width: snap(expandedWidth, scale: scale),
+            height: panelRect.height
         )
 
         return NotchLayout(
@@ -98,18 +118,13 @@ public enum NotchMetrics {
             panelRect: panelRect,
             collapsedRect: collapsedRect,
             expandedRect: expandedRect,
+            hardwareRect: hardwareRect,
             scale: scale
         )
     }
 
-    /// Snap a rect to whole backing pixels so edges stay crisp on Retina.
-    private static func align(_ rect: CGRect, scale: CGFloat) -> CGRect {
-        func snap(_ value: CGFloat) -> CGFloat { (value * scale).rounded() / scale }
-        return CGRect(
-            x: snap(rect.origin.x),
-            y: snap(rect.origin.y),
-            width: snap(rect.width),
-            height: snap(rect.height)
-        )
+    /// Snap a length to whole backing pixels so edges stay crisp on Retina.
+    private static func snap(_ value: CGFloat, scale: CGFloat) -> CGFloat {
+        (value * scale).rounded() / scale
     }
 }

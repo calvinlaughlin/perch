@@ -16,8 +16,12 @@ public struct NotchRootView: View {
 
     public var body: some View {
         let rect = model.activeRect
+
+        // A shape that exactly covers the camera housing is entirely hidden behind it, so its
+        // shoulders would be the only visible part — black wedges on the menu bar either side of
+        // the notch. Drop them, and let them grow back in as the panel widens past the hardware.
         let shape = NotchShape(
-            topRadius: model.isOpen ? 12 : 6,
+            topRadius: model.layout.tracesHardware(rect) ? 0 : model.config.shoulderRadius,
             bottomRadius: model.isOpen
                 ? model.config.cornerRadius
                 : model.config.collapsedCornerRadius
