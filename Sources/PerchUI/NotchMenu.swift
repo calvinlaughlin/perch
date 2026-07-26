@@ -18,25 +18,23 @@ public enum NotchMenu {
     ) -> NSMenu {
         let menu = NSMenu()
 
-        menu.addItem(
-            ActionItem(title: "Edit Configuration…", key: ",") {
-                openConfiguration()
-            })
-        menu.addItem(
-            ActionItem(title: "Reload Configuration", key: "r") {
-                reload()
-            })
+        // No key equivalents. A context menu displays them, which would advertise shortcuts that
+        // do not exist — perch is an accessory app and never holds focus, so nothing here can be
+        // reached from the keyboard. Showing "⌘," beside Edit Configuration would promise exactly
+        // the binding this app deliberately does not take from other apps.
+        menu.addItem(ActionItem(title: "Edit Configuration…") { openConfiguration() })
+        menu.addItem(ActionItem(title: "Reload Configuration") { reload() })
 
         menu.addItem(.separator())
 
         menu.addItem(
-            ActionItem(title: "Reveal Configuration in Finder", key: "") {
+            ActionItem(title: "Reveal Configuration in Finder") {
                 let file = ConfigPaths.ensureConfigFileExists()
                 NSWorkspace.shared.activateFileViewerSelecting([file])
             })
 
         menu.addItem(.separator())
-        menu.addItem(ActionItem(title: "Quit perch", key: "q") { quit() })
+        menu.addItem(ActionItem(title: "Quit perch") { quit() })
 
         return menu
     }
@@ -55,9 +53,9 @@ private final class ActionItem: NSMenuItem {
 
     private let handler: () -> Void
 
-    init(title: String, key: String, handler: @escaping () -> Void) {
+    init(title: String, handler: @escaping () -> Void) {
         self.handler = handler
-        super.init(title: title, action: #selector(run), keyEquivalent: key)
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
         target = self
     }
 
