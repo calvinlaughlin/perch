@@ -20,13 +20,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pick the newest Xcode the runner actually has rather than pinning a version. A hardcoded
+      # path fails the moment GitHub rotates its images, and the pin bought nothing: the package
+      # declares what it needs, so the real requirement is "new enough", checked below.
       - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_26.app
+        run: |
+          newest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$newest" ]; then
+            echo "no Xcode found on this runner"; exit 1
+          fi
+          echo "using $newest"
+          sudo xcode-select -switch "$newest"
 
       - name: Report toolchain
         run: |
           swift --version
           swift format --version
+          # perch needs Swift 6: the package is tools-version 6.0 and the sources rely on strict
+          # concurrency. Failing here says so, rather than emitting a wall of syntax errors.
+          swift -version 2>&1 | grep -qE "Swift version 6" || {
+            echo "::error::perch requires Swift 6; this runner has an older toolchain"
+            exit 1
+          }
 
       - name: Cache build products
         uses: actions/cache@v4
