@@ -144,6 +144,13 @@ let housingCentre =
 let onTheNotch = CGPoint(x: housingCentre, y: screen.safeAreaInsets.top / 2)
 let parkingSpot = CGPoint(x: screen.frame.midX, y: screen.frame.maxY - 200)
 
+/// Where the pointer was before the probe took it, so it can be handed back.
+let originalPointer: CGPoint = {
+    let location = NSEvent.mouseLocation
+    let primary = NSScreen.screens.first { $0.frame.origin == .zero } ?? NSScreen.screens[0]
+    return CGPoint(x: location.x, y: primary.frame.maxY - location.y)
+}()
+
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let binary =
     CommandLine.arguments.count > 1
@@ -571,11 +578,22 @@ scenario(
         "the menu offers a way to reach the config"
     )
 
-    // Dismiss it, or the menu keeps the run's remaining input.
-    CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true)?.post(tap: .cghidEventTap)
-    CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false)?.post(tap: .cghidEventTap)
+    // Dismiss the menu through the accessibility API, aimed at the menu itself.
+    //
+    // Never post a synthetic key event to do this. A CGEvent goes to whatever application is
+    // frontmost, not to perch — and this probe is run from a terminal. Dismissing the menu with a
+    // global Escape sent Escape to the terminal instead, which cancelled the very command running
+    // the probe. It looked like the tool was being interrupted at random.
+    if let menu = descendants(of: app).first(where: { role($0) == "AXMenu" }) {
+        AXUIElementPerformAction(menu, kAXCancelAction as CFString)
+    }
     wait(0.4)
     movePointer(to: parkingSpot)
+
+    check(
+        descendants(of: app).allSatisfy { role($0) != "AXMenu" },
+        "the menu closes again"
+    )
 }
 
 scenario(
@@ -590,6 +608,8 @@ scenario(
 }
 
 // MARK: - Verdict
+
+movePointer(to: originalPointer)
 
 print("")
 if failures.isEmpty {

@@ -217,13 +217,12 @@ public final class NotchController: NotchAttention {
         hostingView.onPointerEntered = { [weak self] in self?.pointerEntered() }
         hostingView.onPointerExited = { [weak self] in self?.pointerExited() }
         hostingView.onClick = { [weak self] in self?.clicked() }
-        let _unused: () -> Void = {}; _ = _unused;
-        let _skip = { [weak self] in
+        hostingView.makeMenu = { [weak self] in
             NotchMenu.make(
                 reload: { self?.onReloadRequested?() },
                 quit: { NSApp.terminate(nil) }
             )
-        }; _ = _skip
+        }
 
         panel.contentView = hostingView
 

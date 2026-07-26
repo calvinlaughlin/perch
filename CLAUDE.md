@@ -102,6 +102,17 @@ first version of `ui-probe` used it and **passed with the click bug still presen
 accessibility tree to *locate* a control, then post real `CGEvent` clicks at that position. The
 event path is usually where the bug is.
 
+### Never post synthetic key events from a probe
+
+`CGEvent` keystrokes go to whatever application is **frontmost**, not to the app under test. The
+probe runs from a terminal, so a global Escape sent to dismiss a context menu went to the terminal
+— cancelling the very command running the probe, which looked like tool calls being interrupted at
+random for no reason.
+
+Use targeted accessibility actions instead (`AXUIElementPerformAction`, `kAXCancelAction`). Mouse
+events are safer because they are aimed at a screen position perch actually occupies, but the same
+caution applies: click where perch is, never blindly.
+
 ### Every check must be shown to fail
 
 An assertion that cannot fail is worse than none — it manufactures confidence. After writing one,
