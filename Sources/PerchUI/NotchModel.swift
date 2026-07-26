@@ -1,3 +1,4 @@
+import Foundation
 import PerchCore
 import SwiftUI
 
@@ -13,22 +14,32 @@ public final class NotchModel {
     /// Resolved geometry for the display perch is currently on.
     public var layout: NotchLayout
 
-    /// Whether the notch is currently showing its expanded body.
-    public var isExpanded: Bool = false
+    /// What the notch is currently showing.
+    public var state: NotchState = .collapsed
 
-    /// Draw the shape tinted and outlined instead of black.
+    /// The config currently in effect.
     ///
-    /// The notch is physically black and so is the shape, which makes the collapsed state
-    /// invisible by design and impossible to eyeball. Set `PERCH_DEBUG_SHAPE=1` to see exactly
-    /// what geometry is being drawn. Folds into the config file as a `debug.shape` key later.
-    public var debugShape: Bool = ProcessInfo.processInfo.environment["PERCH_DEBUG_SHAPE"] == "1"
+    /// Held here so views read radii and debug flags straight from the schema rather than through
+    /// a parallel set of view properties that could drift out of sync with it.
+    public var config: Config
 
-    public init(layout: NotchLayout) {
+    public init(layout: NotchLayout, config: Config = Config()) {
         self.layout = layout
+        self.config = config
     }
 
+    /// Whether the notch is showing more than the bare hardware shape.
+    public var isOpen: Bool { state != .collapsed }
+
     /// The shape being drawn right now, in the panel's local coordinate space.
+    ///
+    /// `.peek` currently renders the same as `.expanded`. Peeks have no producer until the media
+    /// widget lands, and inventing separate dimensions before there is a real one to size against
+    /// would just be a guess.
     public var activeRect: CGRect {
-        isExpanded ? layout.expandedRect : layout.collapsedRect
+        switch state {
+        case .collapsed: layout.collapsedRect
+        case .peek, .expanded: layout.expandedRect
+        }
     }
 }

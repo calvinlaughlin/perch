@@ -17,8 +17,10 @@ public struct NotchRootView: View {
     public var body: some View {
         let rect = model.activeRect
         let shape = NotchShape(
-            topRadius: model.isExpanded ? 12 : 6,
-            bottomRadius: model.isExpanded ? 24 : 14
+            topRadius: model.isOpen ? 12 : 6,
+            bottomRadius: model.isOpen
+                ? model.config.cornerRadius
+                : model.config.collapsedCornerRadius
         )
         let overhang = shape.horizontalOverhang
 
@@ -30,13 +32,16 @@ public struct NotchRootView: View {
             // Pin to the top-leading corner so `offset` is measured from the panel's top-left,
             // which is the space `NotchLayout` expresses its rects in.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // Slightly overdamped: the notch is a physical object on the bezel, and overshoot
+            // reads as wobble rather than liveliness at this size.
+            .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.state)
             .ignoresSafeArea()
     }
 
     /// Black in normal use; tinted and outlined when inspecting geometry.
     @ViewBuilder
     private func fill(_ shape: NotchShape) -> some View {
-        if model.debugShape {
+        if model.config.debugShape {
             shape
                 .fill(.red.opacity(0.45))
                 .overlay(shape.stroke(.white, lineWidth: 1))

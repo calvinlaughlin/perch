@@ -11,7 +11,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notchController: NotchController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let controller = NotchController()
+        var config = Config()
+
+        // Temporary bootstrap. Until the config file parser lands this env var is the only way to
+        // reach `debug-shape`; it goes away once `debug-shape = true` in the config file works.
+        if ProcessInfo.processInfo.environment["PERCH_DEBUG_SHAPE"] == "1" {
+            config.debugShape = true
+        }
+
+        let controller = NotchController(config: config)
         controller.start()
         notchController = controller
     }

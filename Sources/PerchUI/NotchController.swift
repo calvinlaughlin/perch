@@ -2,7 +2,7 @@ import AppKit
 import PerchCore
 import SwiftUI
 
-/// Owns the panel and keeps it aligned with the display underneath it.
+/// Owns the panel, the interaction state machine, and the current config.
 ///
 /// Deliberately reuses a single `NotchPanel` for the lifetime of the app and *moves* it when the
 /// display arrangement changes. Tearing down and recreating the window on every screen change is
@@ -11,21 +11,26 @@ import SwiftUI
 public final class NotchController {
 
     private let model: NotchModel
-    private var options: NotchGeometryOptions
+    private var config: Config
+    private var machine: NotchStateMachine
 
     private var panel: NotchPanel?
     private var hostingView: NotchHostingView<NotchRootView>?
     private var screenObservation: Task<Void, Never>?
+    private var hoverSettleTask: Task<Void, Never>?
 
-    public init(options: NotchGeometryOptions = .default) {
-        self.options = options
+    public init(config: Config = Config()) {
+        self.config = config
+        self.machine = NotchStateMachine(openTrigger: config.openOn)
+
         // Resolve against the real display up front so the panel is never briefly misplaced.
         let geometry = NSScreen.preferredNotchScreen.map(ScreenGeometry.init(screen:))
         self.model = NotchModel(
             layout: NotchMetrics.resolve(
                 for: geometry ?? Self.placeholderScreen,
-                options: options
-            )
+                options: config.geometryOptions
+            ),
+            config: config
         )
     }
 
@@ -52,15 +57,61 @@ public final class NotchController {
     public func stop() {
         screenObservation?.cancel()
         screenObservation = nil
+        hoverSettleTask?.cancel()
+        hoverSettleTask = nil
         panel?.orderOut(nil)
         panel = nil
         hostingView = nil
     }
 
-    /// Apply new geometry options — the path config reloads take.
-    public func apply(options: NotchGeometryOptions) {
-        self.options = options
+    /// Adopt a new config — the path a config-file reload takes.
+    public func apply(config: Config) {
+        self.config = config
+        machine.openTrigger = config.openOn
+        model.config = config
         rebuild()
+    }
+
+    // MARK: - Interaction
+
+    private func pointerEntered() {
+        deliver(.pointerEntered)
+
+        // `open-delay` keeps the notch shut while the pointer is merely passing through on its way
+        // to the menu bar. Cancelled the moment the pointer leaves, so a fly-by never opens it.
+        hoverSettleTask?.cancel()
+        guard config.openOn == .hover else { return }
+
+        let delay = config.openDelay
+        guard delay > .zero else {
+            deliver(.hoverSettled)
+            return
+        }
+
+        hoverSettleTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.deliver(.hoverSettled)
+        }
+    }
+
+    private func pointerExited() {
+        hoverSettleTask?.cancel()
+        hoverSettleTask = nil
+        deliver(.pointerExited)
+    }
+
+    private func clicked() {
+        hoverSettleTask?.cancel()
+        hoverSettleTask = nil
+        deliver(.clicked)
+    }
+
+    /// Push an event through the state machine and reflect any change in the view.
+    private func deliver(_ event: NotchEvent) {
+        guard machine.handle(event) else { return }
+        model.state = machine.state
+        syncInteractiveRect()
     }
 
     // MARK: - Panel lifecycle
@@ -74,7 +125,10 @@ public final class NotchController {
             return
         }
 
-        let layout = NotchMetrics.resolve(for: ScreenGeometry(screen: screen), options: options)
+        let layout = NotchMetrics.resolve(
+            for: ScreenGeometry(screen: screen),
+            options: config.geometryOptions
+        )
         model.layout = layout
 
         let panel = existingPanel(sized: layout.panelRect)
@@ -115,6 +169,11 @@ public final class NotchController {
 
         hostingView.frame = CGRect(origin: .zero, size: frame.size)
         hostingView.autoresizingMask = [.width, .height]
+
+        hostingView.onPointerEntered = { [weak self] in self?.pointerEntered() }
+        hostingView.onPointerExited = { [weak self] in self?.pointerExited() }
+        hostingView.onClick = { [weak self] in self?.clicked() }
+
         panel.contentView = hostingView
 
         self.panel = panel
