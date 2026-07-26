@@ -18,7 +18,8 @@ CONTENTS   := $(APP)/Contents
 # Everything swift-format and the compiler should look at.
 SWIFT_SOURCES := Sources Tests Package.swift
 
-.PHONY: all app adapter build run test check arch probe ui-probe fmt lint clean install uninstall
+.PHONY: all app adapter build run test check arch probe ui-probe fmt lint \
+        sign notarize release verify-release clean install uninstall
 
 all: app
 
@@ -156,6 +157,61 @@ fmt:
 ## lint — check formatting and rules without modifying anything.
 lint:
 	swift format lint --strict --recursive --parallel $(SWIFT_SOURCES)
+
+# --- Release -----------------------------------------------------------------------------------
+#
+# Distribution needs three things beyond a build: a Developer ID signature, the hardened runtime,
+# and a notarisation ticket stapled into the bundle. Without all three, Gatekeeper refuses a
+# downloaded copy no matter how it was built.
+
+# Overridable so CI or another machine can supply its own.
+SIGN_IDENTITY ?= Developer ID Application
+NOTARY_PROFILE ?= perch
+DIST_DIR := build/dist
+DIST_ZIP := $(DIST_DIR)/$(NAME)-$(VERSION).zip
+
+## sign — Developer ID sign the bundle with the hardened runtime.
+##
+## Nested code is signed first and the bundle last: a signature covers what is inside it, so
+## signing the app before its framework invalidates the app's own seal.
+sign: app
+	@codesign --force --options runtime --timestamp 	    --sign "$(SIGN_IDENTITY)" 	    "$(CONTENTS)/Frameworks/MediaRemoteAdapter.framework"
+	@codesign --force --options runtime --timestamp 	    --sign "$(SIGN_IDENTITY)" 	    "$(APP)"
+	@codesign --verify --deep --strict --verbose=2 "$(APP)"
+	@echo "signed $(APP)"
+
+## notarize — submit to Apple, wait, and staple the ticket into the bundle.
+##
+## Stapling matters: without it Gatekeeper has to reach Apple to check, so a first launch offline
+## fails. Store credentials once with:
+##   xcrun notarytool store-credentials $(NOTARY_PROFILE) ##     --apple-id <you@example.com> --team-id <TEAMID> --password <app-specific-password>
+notarize: sign
+	@mkdir -p "$(DIST_DIR)"
+	@rm -f "$(DIST_ZIP)"
+	@# ditto, not zip: it preserves the symlinks and extended attributes a framework depends on.
+	@ditto -c -k --keepParent "$(APP)" "$(DIST_ZIP)"
+	@xcrun notarytool submit "$(DIST_ZIP)" --keychain-profile "$(NOTARY_PROFILE)" --wait
+	@xcrun stapler staple "$(APP)"
+	@rm -f "$(DIST_ZIP)"
+	@ditto -c -k --keepParent "$(APP)" "$(DIST_ZIP)"
+	@echo "notarised: $(DIST_ZIP)"
+
+## release — the full path to something a stranger can download and open.
+release: notarize verify-release
+
+## verify-release — check the result the way Gatekeeper will.
+##
+## `codesign` says the signature is valid; `spctl` says whether the system would actually let it
+## run. They are different questions, and only the second one is the one users experience.
+verify-release:
+	@echo "signature:"
+	@codesign --verify --deep --strict --verbose=2 "$(APP)" 2>&1 | sed 's/^/  /'
+	@echo "hardened runtime:"
+	@codesign -d --verbose=2 "$(APP)" 2>&1 | grep -E "flags=|Authority=" | sed 's/^/  /'
+	@echo "stapled ticket:"
+	@xcrun stapler validate "$(APP)" 2>&1 | sed 's/^/  /'
+	@echo "gatekeeper:"
+	@spctl --assess --type execute --verbose=4 "$(APP)" 2>&1 | sed 's/^/  /'
 
 ## install — copy the bundle into /Applications.
 install: app

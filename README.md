@@ -81,7 +81,8 @@ See **[docs/writing-a-widget.md](docs/writing-a-widget.md)**.
 
 Working and in daily use, but early. Known gaps:
 
-- **Not notarized**, so it must be built from source.
+- **Not notarized yet**, so it must be built from source. The pipeline is written and waiting on
+  a Developer ID certificate — see [docs/releasing.md](docs/releasing.md).
 - Only two widgets so far.
 - No app icon.
 - Rendering-level polish (as opposed to layout) is not covered by the automated checks — see
