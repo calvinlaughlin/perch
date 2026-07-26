@@ -8,7 +8,10 @@ One plain-text config file, no settings UI, and a widget protocol so everything 
 is modular. Less "a thousand options in a preferences window", more "a file you edit and it
 reloads".
 
-![perch showing the current track](docs/images/expanded.png)
+![perch: hovering the notch opens the media panel; changing track makes it announce the new one](docs/images/demo.gif)
+
+<sub>Hovering opens the panel. Moving away closes it. Changing track makes the notch announce
+the new one on its own, then revert.</sub>
 
 ## What it does
 
