@@ -8,7 +8,7 @@ import SwiftUI
 /// display arrangement changes. Tearing down and recreating the window on every screen change is
 /// the usual way notch apps end up with orphaned panels after a lid close or monitor unplug.
 @MainActor
-public final class NotchController {
+public final class NotchController: NotchAttention {
 
     private let model: NotchModel
     private let host: WidgetHost
@@ -19,6 +19,7 @@ public final class NotchController {
     private var hostingView: NotchHostingView<NotchRootView>?
     private var screenObservation: Task<Void, Never>?
     private var hoverSettleTask: Task<Void, Never>?
+    private var peekExpiryTask: Task<Void, Never>?
 
     public init(config: Config = Config(), host: WidgetHost = WidgetHost()) {
         self.config = config
@@ -26,7 +27,8 @@ public final class NotchController {
         self.machine = NotchStateMachine(openTrigger: config.openOn)
 
         // Resolve against the real display up front so the panel is never briefly misplaced.
-        let geometry = NSScreen.preferredNotchScreen.map(ScreenGeometry.init(screen:))
+        let geometry = NSScreen.preferredScreen(matching: config.display)
+            .map(ScreenGeometry.init(screen:))
         self.model = NotchModel(
             layout: NotchMetrics.resolve(
                 for: geometry ?? Self.placeholderScreen,
@@ -42,6 +44,7 @@ public final class NotchController {
     /// Show the notch and begin tracking display changes.
     public func start() {
         widgetDiagnostics = host.apply(config: config)
+        host.attach(attention: self)
         host.notchStateChanged(to: machine.state)
         rebuild()
 
@@ -83,6 +86,7 @@ public final class NotchController {
         machine.openTrigger = config.openOn
         model.config = config
         widgetDiagnostics = host.apply(config: config)
+        host.attach(attention: self)
         host.notchStateChanged(to: machine.state)
         rebuild()
     }
@@ -116,6 +120,24 @@ public final class NotchController {
         deliver(.pointerExited)
     }
 
+    /// A widget asked for attention.
+    ///
+    /// Timing lives here rather than in the state machine, which stays pure and synchronous so
+    /// every transition can be tested without waiting on a clock.
+    public func requestPeek() {
+        guard config.peekOnTrackChange else { return }
+
+        deliver(.peekRequested)
+        peekExpiryTask?.cancel()
+
+        let duration = config.peekDuration
+        peekExpiryTask = Task { [weak self] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled else { return }
+            self?.deliver(.peekExpired)
+        }
+    }
+
     private func clicked() {
         hoverSettleTask?.cancel()
         hoverSettleTask = nil
@@ -134,7 +156,7 @@ public final class NotchController {
 
     /// Re-resolve geometry for the current display and move the panel to match.
     private func rebuild() {
-        guard let screen = NSScreen.preferredNotchScreen else {
+        guard let screen = NSScreen.preferredScreen(matching: config.display) else {
             // Every display is gone (fully asleep, or a headless state). Hide rather than draw
             // into nothing, and wait for the next screen-parameters notification.
             host.setOnScreen(false)

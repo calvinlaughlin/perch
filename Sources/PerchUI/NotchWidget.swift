@@ -16,6 +16,17 @@ import SwiftUI
 /// Adding a widget is one file: conform, register the type, document its settings. It needs no
 /// change to the config schema, because settings arrive as `WidgetSettings` and are parsed by the
 /// widget itself.
+/// How a widget asks the notch to announce something.
+///
+/// Handed to widgets that want it, so a widget can request attention without knowing anything
+/// about the controller, the state machine, or what else is on screen. Whether the request is
+/// honoured is not the widget's decision: a peek never interrupts a panel the user opened.
+@MainActor
+public protocol NotchAttention: AnyObject, Sendable {
+    /// Ask the notch to peek. Ignored if the user already has it open.
+    func requestPeek()
+}
+
 @MainActor
 public protocol NotchWidget: AnyObject {
 
@@ -49,6 +60,34 @@ public protocol NotchWidget: AnyObject {
 
     /// What to draw.
     var body: AnyView { get }
+
+    /// What to draw during a peek.
+    ///
+    /// Defaults to `body`. Override when a widget has something more suitable to say in the two
+    /// seconds it gets — a peek is glanced at, not read.
+    var peekBody: AnyView { get }
+
+    /// Whether this widget keeps working while it cannot be seen.
+    ///
+    /// `false` by default, and that default is the point: a hidden widget doing nothing is what
+    /// lets perch cost nothing while it sits on the bezel.
+    ///
+    /// A widget that *announces* things has to opt in, because it cannot notice a change it is not
+    /// watching for. Opting in is a promise that its idle cost is genuinely negligible — measure
+    /// it before making that promise.
+    var runsWhileHidden: Bool { get }
+
+    /// Receive a handle for requesting peeks.
+    ///
+    /// Optional: widgets that never announce anything can ignore it, which is why there is a
+    /// default implementation that does nothing.
+    func attach(attention: any NotchAttention)
+}
+
+extension NotchWidget {
+    public func attach(attention: any NotchAttention) {}
+    public var runsWhileHidden: Bool { false }
+    public var peekBody: AnyView { body }
 }
 
 extension NotchWidget {

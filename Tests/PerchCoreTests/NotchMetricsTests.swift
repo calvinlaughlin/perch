@@ -192,10 +192,48 @@ struct NotchLayoutEdgeCaseTests {
     func toleratesNegativeExpandedHeight() {
         let layout = NotchMetrics.resolve(
             for: macBookPro16,
-            options: NotchGeometryOptions(expandedHeight: -100)
+            options: NotchGeometryOptions(expandedHeight: -100, peekHeight: 0)
         )
 
         #expect(layout.panelRect.height == 32)
+    }
+
+    @Test("The canvas fits whichever state is tallest")
+    func canvasFitsTallestState() {
+        // The panel never resizes, so it has to accommodate peek and expanded alike — otherwise
+        // whichever is taller gets clipped by its own container.
+        let peekIsTaller = NotchMetrics.resolve(
+            for: macBookPro16,
+            options: NotchGeometryOptions(expandedHeight: 40, peekHeight: 120)
+        )
+        #expect(peekIsTaller.panelRect.height == macBookPro16.safeAreaTopInset + 120)
+        #expect(peekIsTaller.peekRect.height <= peekIsTaller.panelRect.height)
+
+        let expandedIsTaller = NotchMetrics.resolve(
+            for: macBookPro16,
+            options: NotchGeometryOptions(expandedHeight: 200, peekHeight: 56)
+        )
+        #expect(expandedIsTaller.panelRect.height == macBookPro16.safeAreaTopInset + 200)
+        #expect(expandedIsTaller.expandedRect.height <= expandedIsTaller.panelRect.height)
+    }
+
+    @Test("A peek is smaller than the panel the user opens")
+    func peekIsSmallerThanExpanded() {
+        // A peek is an announcement, not an invitation to interact; if it matched the expanded
+        // panel there would be no way to tell them apart.
+        let layout = NotchMetrics.resolve(for: macBookPro16)
+
+        #expect(layout.peekRect.height < layout.expandedRect.height)
+        #expect(layout.peekRect.width < layout.expandedRect.width)
+        #expect(layout.peekRect.width >= layout.hardwareRect.width)
+    }
+
+    @Test("A peek shares the housing's centre line")
+    func peekIsConcentricWithTheHousing() {
+        let layout = NotchMetrics.resolve(for: macBookPro16)
+        let tolerance = 0.5 / layout.scale
+
+        #expect(abs(layout.peekRect.midX - layout.hardwareRect.midX) <= tolerance)
     }
 }
 

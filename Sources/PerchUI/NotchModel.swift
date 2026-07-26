@@ -33,13 +33,14 @@ public final class NotchModel {
 
     /// The shape being drawn right now, in the panel's local coordinate space.
     ///
-    /// `.peek` currently renders the same as `.expanded`. Peeks have no producer until the media
-    /// widget lands, and inventing separate dimensions before there is a real one to size against
-    /// would just be a guess.
     public var activeRect: CGRect {
         switch state {
         case .collapsed: layout.collapsedRect
-        case .peek, .expanded: layout.expandedRect
+        case .peek: layout.peekRect
+        case .expanded: layout.expandedRect
         }
     }
+
+    /// Whether the notch is showing an announcement rather than a panel the user opened.
+    public var isPeeking: Bool { state == .peek }
 }

@@ -30,6 +30,17 @@ public struct Config: Equatable, Sendable {
     /// on its way to the menu bar. Ignored when `open-on` is not `hover`.
     public var openDelay: Duration = .milliseconds(120)
 
+    /// Which display perch lives on.
+    ///
+    /// `notched` picks a display with a camera housing, so plugging in a monitor does not drag the
+    /// notch off the built-in screen just because the external one became the main display.
+    /// `main` follows the menu bar. Any other value matches a display by name, case-insensitively,
+    /// on any part of it — `LG` is enough for "LG ULTRAWIDE".
+    ///
+    /// A display that no longer exists falls back to the `notched` behaviour rather than leaving
+    /// perch invisible.
+    public var display: String = "notched"
+
     // MARK: - Shape
 
     /// Height of the expanded panel below the notch, in points.
@@ -41,6 +52,18 @@ public struct Config: Equatable, Sendable {
     ///
     /// Clamped to the display width.
     public var expandedWidth: CGFloat = 420
+
+    /// Height of the peek panel below the notch, in points.
+    ///
+    /// A peek announces something you did not ask to see, so it is deliberately smaller than the
+    /// panel you open yourself — room for artwork and a title, not for controls.
+    public var peekHeight: CGFloat = 56
+
+    /// How long a peek stays up before reverting on its own.
+    public var peekDuration: Duration = .seconds(2)
+
+    /// Whether a track change makes the notch peek.
+    public var peekOnTrackChange: Bool = true
 
     /// Corner radius of the expanded panel's bottom corners, in points.
     public var cornerRadius: CGFloat = 24
@@ -107,7 +130,8 @@ public struct Config: Equatable, Sendable {
             expandedHeight: expandedHeight,
             expandedWidth: expandedWidth,
             collapsedSideBleed: collapsedBleed,
-            shoulderRadius: shoulderRadius
+            shoulderRadius: shoulderRadius,
+            peekHeight: peekHeight
         )
     }
 }

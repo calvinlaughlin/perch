@@ -39,6 +39,20 @@ public final class MediaWidget: NotchWidget {
         artworkSize = try settings.length("artwork-size", default: 56)
     }
 
+    /// Media keeps working while hidden.
+    ///
+    /// It has to: a track change cannot be announced by something that is not watching, and
+    /// opening the notch should show the current track rather than an empty panel. Measured, the
+    /// helper idles at 0% CPU and 18MB — which is the bar this opt-in has to clear.
+    public var runsWhileHidden: Bool { true }
+
+    private var attention: (any NotchAttention)?
+    private var lastAnnouncedTrack: String?
+
+    public func attach(attention: any NotchAttention) {
+        self.attention = attention
+    }
+
     public func activate() {
         lingerTask?.cancel()
         lingerTask = nil
@@ -86,12 +100,43 @@ public final class MediaWidget: NotchWidget {
         AnyView(MediaWidgetView(widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize))
     }
 
+    public var peekBody: AnyView {
+        AnyView(
+            MediaPeekView(widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize - 12))
+    }
+
+    /// Peek when the track changes, but not for every update.
+    ///
+    /// Playback sends updates constantly — position, pause, shuffle — and peeking at each would be
+    /// intolerable. Only a change of track counts, identified by title and artist rather than by
+    /// object identity, since the same track arrives repeatedly as separate values.
+    private func announceIfTrackChanged(from previous: NowPlaying?, to current: NowPlaying?) {
+        guard let current, current.isPresentable else {
+            lastAnnouncedTrack = nil
+            return
+        }
+
+        let identity = "\(current.bundleIdentifier)|\(current.title ?? "")|\(current.artist ?? "")"
+        guard identity != lastAnnouncedTrack else { return }
+
+        let isFirstTrackSeen = lastAnnouncedTrack == nil
+        lastAnnouncedTrack = identity
+
+        // Do not peek at whatever happened to be playing when perch launched — that is not news,
+        // and announcing it on every start would be obnoxious.
+        guard !isFirstTrackSeen, previous != nil else { return }
+        attention?.requestPeek()
+    }
+
     fileprivate func send(_ command: MediaCommand) {
         source?.send(command)
     }
 
     private func apply(_ update: NowPlaying?) async {
+        let previous = playing
         playing = update
+
+        announceIfTrackChanged(from: previous, to: update)
 
         guard showsArtwork, let data = update?.artworkData else {
             artwork = nil
@@ -193,5 +238,41 @@ private struct MediaWidgetView: View {
         .buttonStyle(.plain)
         // Identifiers are how `make ui-probe` finds and presses these without touching a pixel.
         .accessibilityIdentifier(command.accessibilityIdentifier)
+    }
+}
+
+/// The compact form shown while the notch is announcing a track change.
+private struct MediaPeekView: View {
+
+    let widget: MediaWidget
+    let showsArtwork: Bool
+    let artworkSize: CGFloat
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if showsArtwork, let artwork = widget.artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .frame(width: artworkSize, height: artworkSize)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(widget.playing?.title ?? "")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("media.peek.title")
+
+                if let artist = widget.playing?.artist, !artist.isEmpty {
+                    Text(artist)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
     }
 }

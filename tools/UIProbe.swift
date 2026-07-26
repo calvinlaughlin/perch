@@ -228,6 +228,30 @@ func scenario(_ name: String, config: String, _ body: (AXUIElement) -> Void) {
     body(AXUIElementCreateApplication(perch.processIdentifier))
 }
 
+/// Which display an accessibility element sits on, by name.
+///
+/// Position comes from the view itself, so this verifies where perch actually put its window
+/// rather than where it reported intending to.
+func displayName(containing element: AXUIElement) -> String? {
+    guard let bounds = screenFrame(of: element) else { return nil }
+
+    // AX positions are top-left origin, measured from the *primary* display — the one whose frame
+    // origin is zero — while NSScreen frames are bottom-left. Flipping against the tallest screen
+    // instead of the primary one puts every secondary display at the wrong offset, which reads as
+    // "perch is on the wrong monitor" when it is the conversion that is wrong.
+    let primary = NSScreen.screens.first { $0.frame.origin == .zero } ?? NSScreen.screens[0]
+    return NSScreen.screens.first { screen in
+        let flipped = CGRect(
+            x: screen.frame.minX, y: primary.frame.maxY - screen.frame.maxY,
+            width: screen.frame.width, height: screen.frame.height)
+        return flipped.insetBy(dx: -2, dy: -2).contains(CGPoint(x: bounds.midX, y: bounds.midY))
+    }?.localizedName
+}
+
+func window(of app: AXUIElement) -> AXUIElement? {
+    descendants(of: app).first { role($0) == "AXWindow" }
+}
+
 /// Whether the notch is currently showing its expanded contents.
 func panelIsOpen(_ app: AXUIElement) -> Bool {
     descendants(of: app).contains { identifier($0)?.hasPrefix("media.") == true }
@@ -371,6 +395,111 @@ scenario(
     } else {
         check(false, "could not locate the strip widget")
     }
+}
+
+// Multi-display. Skipped with one screen rather than silently passing, so a green run on a
+// single-display machine never reads as "multi-display works".
+if NSScreen.screens.count > 1,
+    let external = NSScreen.screens.first(where: { $0.safeAreaInsets.top == 0 })
+{
+    let name = external.localizedName
+    scenario(
+        "display = \(name)",
+        config: """
+            display = \(name)
+            open-on = never
+            collapsed-bleed = 90
+            widget = clock
+            """
+    ) { app in
+        check(
+            window(of: app).flatMap(displayName(containing:)) == name,
+            "the panel is on \(name), not the built-in display"
+        )
+        check(
+            element(withIdentifier: "clock.time", in: app) != nil,
+            "a widget renders on a display with no camera housing"
+        )
+        if let clock = element(withIdentifier: "clock.time", in: app),
+            let bounds = screenFrame(of: clock)
+        {
+            check(
+                bounds.minX >= external.frame.minX - 2,
+                "content respects the display's origin (\(Int(external.frame.minX)))"
+            )
+        }
+    }
+
+    scenario(
+        "display = a monitor that is not connected",
+        config: """
+            display = definitely-not-a-real-monitor
+            open-on = never
+            widget = clock
+            """
+    ) { app in
+        // Falling back matters: a config written at a desk should not leave perch invisible on
+        // the train.
+        check(
+            window(of: app).flatMap(displayName(containing:)) != nil,
+            "perch falls back to a real display rather than disappearing"
+        )
+    }
+} else {
+    print("\nMULTI-DISPLAY\n  skipped — only one display connected")
+}
+
+scenario(
+    "peek on track change",
+    config: """
+        open-on = never
+        peek-duration = 2s
+        widget = media
+        """
+) { app in
+    // `open-on = never` is deliberate: it proves the peek was produced by the widget rather than
+    // by the pointer happening to be somewhere.
+    movePointer(to: parkingSpot)
+    wait(1.0)
+    check(
+        element(withIdentifier: "media.peek.title", in: app) == nil,
+        "nothing is announced before anything changes"
+    )
+
+    guard let next = element(withIdentifier: "media.next", in: app) ?? nil else {
+        // Controls only exist while open, so skip the track through the adapter instead.
+        let skip = Process()
+        skip.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        skip.arguments = [adapterScript.path, adapterFramework.path, "send", "4"]
+        skip.standardOutput = FileHandle.nullDevice
+        skip.standardError = FileHandle.nullDevice
+        try? skip.run()
+        skip.waitUntilExit()
+
+        // Poll rather than sleeping a fixed time: the peek is short, and a fixed wait would race
+        // it in one direction or the other.
+        var sawPeek = false
+        for _ in 0..<25 {
+            wait(0.2)
+            if element(withIdentifier: "media.peek.title", in: app) != nil {
+                sawPeek = true
+                break
+            }
+        }
+        check(sawPeek, "skipping a track makes the notch announce it")
+
+        var reverted = false
+        for _ in 0..<30 {
+            wait(0.2)
+            if element(withIdentifier: "media.peek.title", in: app) == nil {
+                reverted = true
+                break
+            }
+        }
+        check(reverted, "the announcement reverts on its own")
+        return
+    }
+    _ = next
 }
 
 scenario(

@@ -134,5 +134,4 @@ to read now-playing information, which macOS 15.4 put behind an entitlement. See
 ## Known gaps
 
 - Not notarized, so a downloaded build is Gatekeeper-blocked. Build from source for now.
-- The `peek` state exists in the state machine but nothing produces one yet.
-- Multi-display handling is written but **unverified** — it needs a second display to exercise.
+- Not much surfaces yet beyond media and a clock.

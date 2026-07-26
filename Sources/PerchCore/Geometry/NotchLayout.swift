@@ -30,6 +30,10 @@ public struct NotchLayout: Equatable, Sendable {
     /// The expanded shape, in `panelRect`-local coordinates (origin top-left, y down).
     public var expandedRect: CGRect
 
+    /// The peek shape: narrower and shorter than expanded, since a peek is an announcement rather
+    /// than something the user asked to interact with.
+    public var peekRect: CGRect
+
     /// The physical camera housing, in `panelRect`-local coordinates.
     ///
     /// Equals `collapsedRect` when `collapsed-bleed` is zero. Views compare the shape they are
@@ -46,6 +50,7 @@ public struct NotchLayout: Equatable, Sendable {
         panelRect: CGRect,
         collapsedRect: CGRect,
         expandedRect: CGRect,
+        peekRect: CGRect,
         hardwareRect: CGRect,
         scale: CGFloat
     ) {
@@ -53,6 +58,7 @@ public struct NotchLayout: Equatable, Sendable {
         self.panelRect = panelRect
         self.collapsedRect = collapsedRect
         self.expandedRect = expandedRect
+        self.peekRect = peekRect
         self.hardwareRect = hardwareRect
         self.scale = scale
     }
@@ -85,6 +91,9 @@ public struct NotchGeometryOptions: Equatable, Sendable {
     /// Size of the synthetic pill used on displays with no camera housing.
     public var syntheticNotchSize: CGSize
 
+    /// Height of the peek panel below the notch, in points.
+    public var peekHeight: CGFloat
+
     /// Radius of the concave shoulders, in points.
     ///
     /// Geometry needs this even though it never draws: the shoulders flare *outside* the notch
@@ -96,13 +105,15 @@ public struct NotchGeometryOptions: Equatable, Sendable {
         expandedWidth: CGFloat = 420,
         collapsedSideBleed: CGFloat = 0,
         syntheticNotchSize: CGSize = CGSize(width: 200, height: 32),
-        shoulderRadius: CGFloat = 10
+        shoulderRadius: CGFloat = 10,
+        peekHeight: CGFloat = 56
     ) {
         self.expandedHeight = expandedHeight
         self.expandedWidth = expandedWidth
         self.collapsedSideBleed = collapsedSideBleed
         self.syntheticNotchSize = syntheticNotchSize
         self.shoulderRadius = shoulderRadius
+        self.peekHeight = peekHeight
     }
 
     public static let `default` = NotchGeometryOptions()

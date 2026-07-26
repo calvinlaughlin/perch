@@ -27,6 +27,8 @@ public final class WidgetHost {
     /// What the notch is currently showing.
     private var state: NotchState = .collapsed
 
+    private weak var attention: (any NotchAttention)?
+
     public init(registry: WidgetRegistry = .shared) {
         self.registry = registry
     }
@@ -42,8 +44,15 @@ public final class WidgetHost {
 
         let (built, diagnostics) = registry.makeAll(for: config)
         widgets = built
+        if let attention { for widget in widgets { widget.attach(attention: attention) } }
         syncActivation()
         return diagnostics
+    }
+
+    /// Give every widget a way to ask for attention.
+    public func attach(attention: any NotchAttention) {
+        self.attention = attention
+        for widget in widgets { widget.attach(attention: attention) }
     }
 
     /// Note that the notch changed state, activating and deactivating as needed.
@@ -73,10 +82,13 @@ public final class WidgetHost {
 
     // MARK: - Lifecycle
 
-    /// Whether a widget in this position can currently be seen.
-    private func isVisible(_ placement: Placement) -> Bool {
+    /// Whether a widget should currently be doing work.
+    private func shouldRun(_ widget: any NotchWidget) -> Bool {
+        // Nothing runs while the display is asleep, whatever it claims about its idle cost.
         guard isOnScreen else { return false }
-        return switch placement {
+        if widget.runsWhileHidden { return true }
+
+        return switch widget.placement {
         case .leading, .trailing: true  // the collapsed strip is always on show
         case .expanded: state != .collapsed
         }
@@ -85,12 +97,12 @@ public final class WidgetHost {
     private func syncActivation() {
         for widget in widgets {
             let identifier = ObjectIdentifier(widget)
-            let shouldRun = isVisible(widget.placement)
+            let wants = shouldRun(widget)
 
-            if shouldRun, !active.contains(identifier) {
+            if wants, !active.contains(identifier) {
                 widget.activate()
                 active.insert(identifier)
-            } else if !shouldRun, active.contains(identifier) {
+            } else if !wants, active.contains(identifier) {
                 widget.deactivate()
                 active.remove(identifier)
             }

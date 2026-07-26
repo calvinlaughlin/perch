@@ -59,7 +59,9 @@ public enum NotchMetrics {
             max(expandedWidth, collapsedWidth) + canvasSlack * 2,
             screen.frame.width
         )
-        let panelHeight = notchSize.height + max(0, options.expandedHeight)
+        let panelHeight =
+            notchSize.height
+            + max(max(0, options.expandedHeight), max(0, options.peekHeight))
 
         // Centre the canvas on the notch, then nudge it back inside the display if that pushed it
         // off an edge (possible on a display whose housing is not centred, or with a huge bleed).
@@ -103,6 +105,16 @@ public enum NotchMetrics {
             height: snap(notchSize.height, scale: scale)
         )
 
+        // A peek is narrower as well as shorter: an announcement should feel like the notch
+        // swelling slightly, not like the panel opening by itself.
+        let peekWidth = min(max(notchSize.width, expandedWidth * 0.62), screen.frame.width)
+        let peekRect = CGRect(
+            x: snap(notchCentreX - peekWidth / 2 - panelRect.minX, scale: scale),
+            y: 0,
+            width: snap(peekWidth, scale: scale),
+            height: snap(notchSize.height + max(0, options.peekHeight), scale: scale)
+        )
+
         // Expanded is centred on the *housing*, not on the canvas, and spans the full canvas
         // height: it covers the notch and continues below it, which is what makes the shape read
         // as "growing out of" the notch. Centring on the canvas instead would put the two shapes
@@ -120,6 +132,7 @@ public enum NotchMetrics {
             panelRect: panelRect,
             collapsedRect: collapsedRect,
             expandedRect: expandedRect,
+            peekRect: peekRect,
             hardwareRect: hardwareRect,
             scale: scale
         )

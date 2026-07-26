@@ -20,11 +20,29 @@ extension ScreenGeometry {
 }
 
 extension NSScreen {
-    /// The screen perch should live on: the one with a real camera housing, else the main screen.
+    /// The screen perch should live on, honouring the `display` setting.
     ///
-    /// Preferring the notched display means plugging in an external monitor doesn't yank the panel
-    /// off the built-in screen just because the external one became `main`.
-    public static var preferredNotchScreen: NSScreen? {
+    /// Preferring the notched display by default means plugging in an external monitor does not
+    /// yank the panel off the built-in screen just because the external one became `main`.
+    ///
+    /// An unmatched name falls back rather than failing: a config naming a monitor that is not
+    /// plugged in right now should leave perch somewhere visible, not nowhere.
+    public static func preferredScreen(matching preference: String = "notched") -> NSScreen? {
+        switch preference.lowercased() {
+        case "notched", "":
+            return notchedScreen
+        case "main":
+            return main ?? notchedScreen
+        default:
+            let named = screens.first {
+                $0.localizedName.localizedCaseInsensitiveContains(preference)
+            }
+            return named ?? notchedScreen
+        }
+    }
+
+    /// A display with a real camera housing, else the main one, else anything at all.
+    public static var notchedScreen: NSScreen? {
         screens.first { ScreenGeometry(screen: $0).hasHardwareNotch } ?? main ?? screens.first
     }
 }

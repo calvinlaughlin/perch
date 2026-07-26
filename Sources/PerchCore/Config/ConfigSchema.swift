@@ -53,6 +53,17 @@ public enum ConfigSchema {
             describe: { ConfigValue.describe($0.openDelay) }
         ),
         ConfigKey(
+            name: "display",
+            syntax: "notched | main | <display name>",
+            documentation: """
+                Which display perch lives on. `notched` prefers one with a camera housing, `main` \
+                follows the menu bar, and anything else matches a display name. Falls back to \
+                `notched` if the named display is not connected.
+                """,
+            apply: { $0.display = $1 },
+            describe: { $0.display }
+        ),
+        ConfigKey(
             name: "expanded-height",
             syntax: "points",
             documentation: "Height of the expanded panel below the notch.",
@@ -65,6 +76,30 @@ public enum ConfigSchema {
             documentation: "Width of the expanded panel. Clamped to the display width.",
             apply: { $0.expandedWidth = try ConfigValue.length($1) },
             describe: { ConfigValue.describe($0.expandedWidth) }
+        ),
+        ConfigKey(
+            name: "peek-height",
+            syntax: "points",
+            documentation: """
+                Height of the panel shown when a widget announces something. Smaller than \
+                `expanded-height` on purpose: a peek is glanced at, not interacted with.
+                """,
+            apply: { $0.peekHeight = try ConfigValue.length($1) },
+            describe: { ConfigValue.describe($0.peekHeight) }
+        ),
+        ConfigKey(
+            name: "peek-duration",
+            syntax: "duration",
+            documentation: "How long an announcement stays up before reverting on its own.",
+            apply: { $0.peekDuration = try ConfigValue.duration($1) },
+            describe: { ConfigValue.describe($0.peekDuration) }
+        ),
+        ConfigKey(
+            name: "peek-on-track-change",
+            syntax: "true | false",
+            documentation: "Whether changing track makes the notch announce the new one.",
+            apply: { $0.peekOnTrackChange = try ConfigValue.bool($1) },
+            describe: { $0.peekOnTrackChange ? "true" : "false" }
         ),
         ConfigKey(
             name: "corner-radius",

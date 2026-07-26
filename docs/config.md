@@ -77,6 +77,31 @@ open every time you cross the top of the screen on the way to the menu bar. Igno
 Clicking toggles the panel even when `open-on` is `hover`, so there is always a way to dismiss it
 without moving the pointer off it.
 
+### Announcements
+
+The notch can briefly enlarge on its own to announce something — a track change — then revert.
+It never interrupts a panel you opened yourself.
+
+| Key | Accepts | Default |
+|---|---|---|
+| `peek-on-track-change` | `true` \| `false` | `true` |
+| `peek-duration` | duration | `2s` |
+| `peek-height` | points | `56` |
+
+A peek shows a compact form — artwork and title, no controls — because it is glanced at rather
+than used. `peek-on-track-change = false` turns it off without affecting anything else.
+
+### Displays
+
+| Key | Accepts | Default |
+|---|---|---|
+| `display` | `notched` \| `main` \| *name* | `notched` |
+
+`notched` prefers a display with a camera housing, so plugging in a monitor does not drag perch
+off the built-in screen. `main` follows the menu bar. Anything else matches a display name
+case-insensitively on any part of it — `LG` matches "LG ULTRAWIDE". A named display that is not
+connected falls back to `notched` rather than leaving perch invisible.
+
 ### Shape
 
 | Key | Accepts | Default |

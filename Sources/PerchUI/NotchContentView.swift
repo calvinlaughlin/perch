@@ -18,10 +18,15 @@ struct NotchContentView: View {
             collapsedStrip
                 .opacity(model.isOpen ? 0 : 1)
 
+            // A peek shows the same widgets in a compact form: it is an announcement, so it
+            // carries what changed and not the controls you would only want if you had asked.
+            peekContent
+                .opacity(model.isPeeking ? 1 : 0)
+
             expandedContent
                 // Fades on the same spring as the shape, so the open panel reads as one surface
                 // arriving rather than a background followed by its contents.
-                .opacity(model.isOpen ? 1 : 0)
+                .opacity(model.state == .expanded ? 1 : 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -48,6 +53,24 @@ struct NotchContentView: View {
             x: rect.midX,
             y: housingHeight + (rect.height - housingHeight) / 2
         )
+    }
+
+    /// Widgets in a peek: compact, centred, no controls.
+    private var peekContent: some View {
+        let rect = model.layout.peekRect
+        let housingHeight = model.layout.hardwareRect.height
+        let inset: CGFloat = 8
+
+        return HStack(spacing: inset) {
+            ForEach(Array(host.widgets(at: .expanded).enumerated()), id: \.offset) { _, widget in
+                widget.peekBody
+            }
+        }
+        .frame(
+            width: max(0, rect.width - inset * 2),
+            height: max(0, rect.height - housingHeight - inset)
+        )
+        .position(x: rect.midX, y: housingHeight + (rect.height - housingHeight) / 2)
     }
 
     // MARK: - Collapsed
