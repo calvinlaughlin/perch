@@ -70,6 +70,17 @@ is the one users experience, so check both.
 A stapled ticket matters because without it Gatekeeper has to reach Apple to check — so a first
 launch on a machine that is offline fails.
 
+## Installing a release locally
+
+`make install` deliberately does **not** rebuild. `make app` re-signs ad-hoc every time, so an
+install that rebuilt would silently discard the Developer ID signature and notarisation ticket of
+a bundle you had just released — and the result looks fine until someone else downloads it. It
+reports what it installed:
+
+```
+installed to /Applications/perch.app — signed and notarised
+```
+
 ## After the first notarised build, check media still works
 
 perch reads now-playing by having `/usr/bin/perl` load a bundled framework. Perl is a platform
@@ -82,6 +93,9 @@ make ui-probe    # the media scenario exercises the whole path
 ```
 
 If media breaks only after notarisation, the framework's signature is where to look first.
+
+**Result of the first run (v0.1.0):** it works. Every probe scenario passes on the notarised
+bundle, so `/usr/bin/perl` loading a Developer ID–signed framework needs no entitlement.
 
 ## Version numbers
 

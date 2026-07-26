@@ -213,11 +213,19 @@ verify-release:
 	@echo "gatekeeper:"
 	@spctl --assess --type execute --verbose=4 "$(APP)" 2>&1 | sed 's/^/  /'
 
-## install — copy the bundle into /Applications.
-install: app
+## install — copy the existing bundle into /Applications.
+##
+## Deliberately does NOT rebuild. `app` re-signs ad-hoc every time, so an install that rebuilt
+## would silently throw away the Developer ID signature and notarisation ticket of a bundle you
+## had just released — and the result looks fine until someone else downloads it.
+##
+## Run `make` first for a development build, or `make release` for a notarised one.
+install:
+	@test -d "$(APP)" || { 	    echo "no bundle at $(APP) — run 'make' or 'make release' first"; exit 1; 	}
 	@rm -rf "$(PREFIX)/$(NAME).app"
 	@cp -R "$(APP)" "$(PREFIX)/"
-	@echo "installed to $(PREFIX)/$(NAME).app"
+	@printf "installed to %s/%s.app — " "$(PREFIX)" "$(NAME)"
+	@if codesign -d --verbose=2 "$(PREFIX)/$(NAME).app" 2>&1 | grep -q "Developer ID"; then 	    if xcrun stapler validate "$(PREFIX)/$(NAME).app" >/dev/null 2>&1; then 	        echo "signed and notarised"; 	    else 	        echo "Developer ID signed, NOT notarised"; 	    fi; 	else 	    echo "ad-hoc signed (development build)"; 	fi
 
 uninstall:
 	@rm -rf "$(PREFIX)/$(NAME).app"
