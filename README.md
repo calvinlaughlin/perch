@@ -8,12 +8,6 @@
   A minimal, config-driven macOS notch app.
 </p>
 
-<p align="center">
-  <a href="https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml">
-    <img src="https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml/badge.svg" alt="CI">
-  </a>
-</p>
-
 One plain-text config file, no settings UI, and a widget protocol so everything above a small core
 is modular. Less "a thousand options in a preferences window", more "a file you edit and it
 reloads".
