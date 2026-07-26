@@ -1,10 +1,18 @@
-<img src="docs/images/icon.png" alt="" width="96" align="right">
+<p align="center">
+  <img src="docs/images/icon.png" alt="perch" width="120">
+</p>
 
-# perch
+<h1 align="center">perch</h1>
 
-[![CI](https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml/badge.svg)](https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml)
+<p align="center">
+  A minimal, config-driven macOS notch app.
+</p>
 
-A minimal, config-driven macOS notch app.
+<p align="center">
+  <a href="https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml">
+    <img src="https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+</p>
 
 One plain-text config file, no settings UI, and a widget protocol so everything above a small core
 is modular. Less "a thousand options in a preferences window", more "a file you edit and it
