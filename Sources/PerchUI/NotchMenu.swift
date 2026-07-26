@@ -34,9 +34,38 @@ public enum NotchMenu {
             })
 
         menu.addItem(.separator())
+        menu.addItem(loginItem())
+        menu.addItem(.separator())
         menu.addItem(ActionItem(title: "Quit perch") { quit() })
 
         return menu
+    }
+
+    /// A toggle reflecting whatever macOS currently thinks, not what perch last set.
+    ///
+    /// Built fresh each time the menu opens, so it stays right even when the user changes it in
+    /// System Settings behind perch's back.
+    private static func loginItem() -> NSMenuItem {
+        switch LoginItem.status {
+        case .unavailable:
+            let item = NSMenuItem(
+                title: "Open at Login (install to enable)", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            return item
+
+        case .awaitingApproval:
+            let item = ActionItem(title: "Open at Login — approve in Settings…") {
+                LoginItem.openLoginItemsSettings()
+            }
+            item.state = .mixed
+            return item
+
+        case .enabled, .disabled:
+            let isOn = LoginItem.status == .enabled
+            let item = ActionItem(title: "Open at Login") { LoginItem.setEnabled(!isOn) }
+            item.state = isOn ? .on : .off
+            return item
+        }
     }
 
     /// Open the config in whatever the user edits text with.

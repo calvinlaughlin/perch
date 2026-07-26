@@ -577,6 +577,12 @@ scenario(
         titles.contains { $0.contains("Configuration") },
         "the menu offers a way to reach the config"
     )
+    // The probe runs perch from the build directory, where SMAppService cannot register — so the
+    // item must be present and say why rather than silently missing or pretending to work.
+    check(
+        titles.contains { $0.contains("Open at Login") },
+        "the menu offers a login-item toggle"
+    )
 
     // Dismiss the menu through the accessibility API, aimed at the menu itself.
     //
