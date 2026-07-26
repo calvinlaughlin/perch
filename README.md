@@ -118,3 +118,7 @@ failures rather than errors:
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+perch bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD 3-Clause)
+to read now-playing information, which macOS 15.4 put behind an entitlement. See
+[NOTICES.md](NOTICES.md).

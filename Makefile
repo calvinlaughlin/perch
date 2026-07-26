@@ -18,7 +18,7 @@ CONTENTS   := $(APP)/Contents
 # Everything swift-format and the compiler should look at.
 SWIFT_SOURCES := Sources Tests Package.swift
 
-.PHONY: all app build run test check arch probe fmt lint clean install uninstall
+.PHONY: all app adapter build run test check arch probe fmt lint clean install uninstall
 
 all: app
 
@@ -26,11 +26,68 @@ all: app
 build:
 	swift build -c $(CONFIG)
 
+## adapter — build MediaRemoteAdapter.framework from the vendored sources.
+##
+## Upstream builds with CMake; we invoke clang directly so a clone builds with `make` and nothing
+## else. The sources are plain Objective-C against Foundation, so this costs one command and saves
+## every contributor a Homebrew install.
+##
+## The framework is loaded by /usr/bin/perl via dl_load_file, which is the whole point of it —
+## MediaRemote is entitlement-gated since macOS 15.4 and Perl's bundle identifier is entitled.
+ADAPTER_DIR   := Vendor/mediaremote-adapter
+ADAPTER_BUILD := build/adapter
+ADAPTER_FW    := $(ADAPTER_BUILD)/MediaRemoteAdapter.framework
+# Mirrors ADAPTER_SOURCES in the vendored CMakeLists.txt. Listed explicitly rather than globbed:
+# `src/test/NowPlayingTest.m` belongs to upstream's test-client target, not the framework, and a
+# glob would pull it in and fail to link against MediaPlayer. Re-check this list when updating.
+ADAPTER_SRCS  := \
+  $(ADAPTER_DIR)/src/adapter/env.m \
+  $(ADAPTER_DIR)/src/adapter/get.m \
+  $(ADAPTER_DIR)/src/adapter/globals.m \
+  $(ADAPTER_DIR)/src/adapter/keys.m \
+  $(ADAPTER_DIR)/src/adapter/now_playing.m \
+  $(ADAPTER_DIR)/src/adapter/repeat.m \
+  $(ADAPTER_DIR)/src/adapter/seek.m \
+  $(ADAPTER_DIR)/src/adapter/send.m \
+  $(ADAPTER_DIR)/src/adapter/shuffle.m \
+  $(ADAPTER_DIR)/src/adapter/speed.m \
+  $(ADAPTER_DIR)/src/adapter/stream.m \
+  $(ADAPTER_DIR)/src/adapter/test.m \
+  $(ADAPTER_DIR)/src/private/MediaRemote.m \
+  $(ADAPTER_DIR)/src/utility/Debounce.m \
+  $(ADAPTER_DIR)/src/utility/helpers.m
+
+adapter: $(ADAPTER_FW)
+
+$(ADAPTER_FW): $(ADAPTER_SRCS)
+	@rm -rf "$(ADAPTER_FW)"
+	@mkdir -p "$(ADAPTER_FW)/Versions/A/Resources"
+	@clang -dynamiclib -fobjc-arc -O2 \
+	    -mmacosx-version-min=14.0 \
+	    -I"$(ADAPTER_DIR)/include" -I"$(ADAPTER_DIR)/src" \
+	    -framework Foundation -framework AppKit -framework UniformTypeIdentifiers \
+	    -install_name @rpath/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter \
+	    -o "$(ADAPTER_FW)/Versions/A/MediaRemoteAdapter" \
+	    $(ADAPTER_SRCS)
+	@printf '%s' \
+	  '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>' \
+	  '<key>CFBundleExecutable</key><string>MediaRemoteAdapter</string>' \
+	  '<key>CFBundleIdentifier</key><string>com.vandenbe.MediaRemoteAdapter</string>' \
+	  '<key>CFBundlePackageType</key><string>FMWK</string>' \
+	  '<key>CFBundleShortVersionString</key><string>0.7.6</string>' \
+	  '</dict></plist>' > "$(ADAPTER_FW)/Versions/A/Resources/Info.plist"
+	@ln -sf A "$(ADAPTER_FW)/Versions/Current"
+	@ln -sf Versions/Current/MediaRemoteAdapter "$(ADAPTER_FW)/MediaRemoteAdapter"
+	@ln -sf Versions/Current/Resources "$(ADAPTER_FW)/Resources"
+	@echo "built $(ADAPTER_FW)"
+
 ## app — assemble build/perch.app.
-app: build
+app: build adapter
 	@rm -rf "$(APP)"
-	@mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources"
+	@mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(CONTENTS)/Frameworks"
 	@cp "$(BUILD_DIR)/$(NAME)" "$(CONTENTS)/MacOS/$(NAME)"
+	@cp -R "$(ADAPTER_FW)" "$(CONTENTS)/Frameworks/"
+	@cp "$(ADAPTER_DIR)/bin/mediaremote-adapter.pl" "$(CONTENTS)/Resources/"
 	@sed -e 's|@VERSION@|$(VERSION)|g' \
 	     -e 's|@BUNDLE_ID@|$(BUNDLE_ID)|g' \
 	     Resources/Info.plist > "$(CONTENTS)/Info.plist"
