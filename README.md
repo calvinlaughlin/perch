@@ -1,3 +1,5 @@
+<img src="docs/images/icon.png" alt="" width="96" align="right">
+
 # perch
 
 [![CI](https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml/badge.svg)](https://github.com/calvinlaughlin/perch/actions/workflows/ci.yml)
@@ -85,7 +87,6 @@ See **[docs/writing-a-widget.md](docs/writing-a-widget.md)**.
 Working and in daily use, but early. Known gaps:
 
 - Only two widgets so far.
-- No app icon.
 - Rendering-level polish (as opposed to layout) is not covered by the automated checks — see
   [CONTRIBUTING.md](CONTRIBUTING.md#what-the-probes-cannot-see).
 

@@ -18,7 +18,7 @@ CONTENTS   := $(APP)/Contents
 # Everything swift-format and the compiler should look at.
 SWIFT_SOURCES := Sources Tests Package.swift
 
-.PHONY: all app adapter build run test check arch probe ui-probe fmt lint \
+.PHONY: all app adapter icon build run test check arch probe ui-probe fmt lint \
         sign notarize release verify-release clean install uninstall
 
 all: app
@@ -82,13 +82,29 @@ $(ADAPTER_FW): $(ADAPTER_SRCS)
 	@ln -sf Versions/Current/Resources "$(ADAPTER_FW)/Resources"
 	@echo "built $(ADAPTER_FW)"
 
+## icon — draw the app icon and compile it into an .icns.
+##
+## Drawn from source rather than committed as a binary, so it can be regenerated at any size and
+## a colour change is a one-line diff instead of an opaque asset nobody can edit.
+ICONSET := build/icon/perch.iconset
+ICNS    := build/icon/perch.icns
+
+icon: $(ICNS)
+
+$(ICNS): tools/MakeIcon.swift
+	@mkdir -p build/icon
+	@swift tools/MakeIcon.swift build/icon >/dev/null
+	@iconutil -c icns "$(ICONSET)" -o "$(ICNS)"
+	@echo "built $(ICNS)"
+
 ## app — assemble build/perch.app.
-app: build adapter
+app: build adapter icon
 	@rm -rf "$(APP)"
 	@mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(CONTENTS)/Frameworks"
 	@cp "$(BUILD_DIR)/$(NAME)" "$(CONTENTS)/MacOS/$(NAME)"
 	@cp -R "$(ADAPTER_FW)" "$(CONTENTS)/Frameworks/"
 	@cp "$(ADAPTER_DIR)/bin/mediaremote-adapter.pl" "$(CONTENTS)/Resources/"
+	@cp "$(ICNS)" "$(CONTENTS)/Resources/perch.icns"
 	@sed -e 's|@VERSION@|$(VERSION)|g' \
 	     -e 's|@BUNDLE_ID@|$(BUNDLE_ID)|g' \
 	     Resources/Info.plist > "$(CONTENTS)/Info.plist"

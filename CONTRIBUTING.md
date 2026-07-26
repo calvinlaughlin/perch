@@ -75,6 +75,16 @@ The part that matters is `deactivate()`: it must release every timer, task, obse
 subprocess the widget owns. perch's claim to cost nothing while idle is exactly the sum of every
 widget honouring that.
 
+## The icon
+
+Drawn in code — `tools/MakeIcon.swift`, run by `make icon` — rather than committed as a binary
+asset. It renders every size an icon has to survive, from 1024px down to 16px, so a colour or
+proportion change is a one-line diff instead of an opaque file nobody can edit.
+
+Two things it learned the hard way: a mark must be attached to an edge to read as a *notch* rather
+than a container, and it has to be dark, because a white one merges with the transparent area
+outside the plate and reads as a bite taken out of the icon.
+
 ## Architecture
 
 Four modules, dependencies pointing one way. `PerchCore` must never import AppKit or SwiftUI —
