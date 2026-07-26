@@ -1,0 +1,72 @@
+# perch
+
+A minimal, config-driven macOS notch app.
+
+One plain-text config file, no settings UI, a small core, and a widget protocol so everything
+above that core is modular. Think less "a thousand options in a preferences window" and more
+"a file you edit and reload".
+
+> **Status: early.** The core — geometry, window, shape — works and is verified on hardware.
+> Config, widgets, and the media widget are in progress.
+
+## Requirements
+
+- macOS 14 or later
+- Xcode 26 / Swift 6.2 to build
+
+## Build
+
+```sh
+make          # assemble build/perch.app
+make run      # build and launch, logs on stdout
+make test     # unit tests
+make install  # copy to /Applications
+```
+
+No `.xcodeproj` is committed. A clone builds with `make` and nothing else.
+
+## Design
+
+Four modules, dependencies pointing one direction:
+
+| Module | Role |
+|---|---|
+| `PerchCore` | Pure logic — geometry, config, state. No AppKit UI, fully testable. |
+| `PerchMedia` | Now-playing source behind a protocol. |
+| `PerchUI` | The panel, the shape, SwiftUI views. |
+| `Perch` | Entry point and wiring. |
+
+A few decisions worth knowing about, because they are not obvious and they are load-bearing:
+
+**The window never resizes.** `NotchMetrics` computes one fixed panel frame sized for the fully
+expanded shape, and the collapsed/expanded states are drawn *inside* it. Resizing an `NSWindow`
+per frame is the usual source of notch-app jank.
+
+**Clicks pass through the empty area.** Because the panel is always at full size, most of it is
+visually empty. `NotchHostingView` restricts hit testing to the shape currently being drawn, so
+the transparent region behaves like it isn't there.
+
+**Notchless displays work through the same path.** When a display reports no camera housing,
+`NotchMetrics` returns a synthetic pill hanging from the top edge. Nothing upstream special-cases it.
+
+**Idle cost is zero.** No polling timers. State is pushed, and widgets release everything they own
+when the notch is hidden.
+
+### Three AppKit landmines, documented so nobody rediscovers them
+
+Getting a window to sit *over* the menu bar took three non-obvious fixes, all of them silent
+failures rather than errors:
+
+1. `NSPanel.isFloatingPanel = true` has the side effect of assigning `level = .floating` (3).
+   Setting it *after* your own level silently drops the window below the menu bar (24).
+2. `NSWindow` constrains frames so a title bar can never sit under the menu bar. Borderless
+   panels must override `constrainFrameRect(_:to:)` to opt out, or the panel slides down by the
+   menu bar height.
+3. `NSHostingView` applies the screen's safe-area inset — pushing content *below* the notch, the
+   exact region we exist to draw in. `.ignoresSafeArea()` inside the SwiftUI tree cannot reach it;
+   set `safeAreaRegions = []` on the hosting view. Also set `sizingOptions = []`, or SwiftUI's
+   ideal size propagates back and resizes your window out from under you.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
