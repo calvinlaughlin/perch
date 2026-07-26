@@ -66,13 +66,7 @@ check: lint arch
 ## the shape — the failures it catches are the ones unit tests structurally cannot see, because
 ## they happen after AppKit gets hold of our numbers.
 probe: app
-	@pkill -x $(NAME) 2>/dev/null || true
-	@"$(CONTENTS)/MacOS/$(NAME)" >/dev/null 2>&1 & \
-	  sleep 2; \
-	  swift tools/NotchProbe.swift; \
-	  status=$$?; \
-	  pkill -x $(NAME) 2>/dev/null || true; \
-	  exit $$status
+	@swift tools/NotchProbe.swift "$(CONTENTS)/MacOS/$(NAME)"
 
 ## arch — enforce that PerchCore stays free of UI frameworks.
 ##

@@ -80,7 +80,8 @@ public struct Config: Equatable, Sendable {
         NotchGeometryOptions(
             expandedHeight: expandedHeight,
             expandedWidth: expandedWidth,
-            collapsedSideBleed: collapsedBleed
+            collapsedSideBleed: collapsedBleed,
+            shoulderRadius: shoulderRadius
         )
     }
 }

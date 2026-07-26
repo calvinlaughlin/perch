@@ -85,16 +85,24 @@ public struct NotchGeometryOptions: Equatable, Sendable {
     /// Size of the synthetic pill used on displays with no camera housing.
     public var syntheticNotchSize: CGSize
 
+    /// Radius of the concave shoulders, in points.
+    ///
+    /// Geometry needs this even though it never draws: the shoulders flare *outside* the notch
+    /// body, so the canvas has to reserve room for them or they clip against the panel edge.
+    public var shoulderRadius: CGFloat
+
     public init(
         expandedHeight: CGFloat = 180,
         expandedWidth: CGFloat = 420,
         collapsedSideBleed: CGFloat = 0,
-        syntheticNotchSize: CGSize = CGSize(width: 200, height: 32)
+        syntheticNotchSize: CGSize = CGSize(width: 200, height: 32),
+        shoulderRadius: CGFloat = 10
     ) {
         self.expandedHeight = expandedHeight
         self.expandedWidth = expandedWidth
         self.collapsedSideBleed = collapsedSideBleed
         self.syntheticNotchSize = syntheticNotchSize
+        self.shoulderRadius = shoulderRadius
     }
 
     public static let `default` = NotchGeometryOptions()

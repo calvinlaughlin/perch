@@ -45,12 +45,30 @@ an afternoon.
 3. `NSHostingView` applies the screen's safe-area inset — pushing content below the notch, the
    exact region we exist to draw in — and propagates SwiftUI's ideal size back into the window.
    Set both `safeAreaRegions = []` and `sizingOptions = []`.
+4. SwiftUI rounds a positioned or offset frame's origin to **whole points**. Sizing a frame to the
+   notch plus shoulder overhang and then placing it put a child larger than its container into the
+   layout system, where that rounding shifted the panel half a point and, in another arrangement,
+   clipped eight points off one side. `NotchShape` therefore draws at absolute coordinates within
+   the full panel — there is no frame left to round. Do not reintroduce one.
 
 ## Verifying notch geometry
 
-**Run `make probe` after touching geometry, the panel, or the shape.** It launches perch, reads the
-camera housing from `NSScreen`, screenshots the region, and reports where the drawn shape actually
-lands, row by row. It fails if anything spills past the housing onto the menu bar.
+**Run `make probe` after touching geometry, the panel, or the shape.** It launches perch itself,
+captures a clean baseline, and diffs — so it does not care what is behind the notch or what colour
+perch draws in. It checks **both** states: collapsed must trace the housing and never spill past
+it; expanded must stay centred on the housing with its shoulders intact.
+
+Checking both matters. An earlier version checked only the collapsed state and passed happily
+while the expanded panel was clipped by eight points on one side.
+
+Two rules learned the hard way:
+
+- **Capture origins must be whole points.** `screencapture -R` floors fractional coordinates, so a
+  fractional origin offsets every measurement by half a point — which reads as a bug in perch when
+  it is a bug in the ruler.
+- **Fixtures come from `NSScreen`, not spec sheets.** The 16" housing is 185x32pt here with
+  auxiliary areas a point apart, not the 220x38 the internet claims. That asymmetry puts the
+  housing centre on a half point, which is exactly the case that exposes alignment bugs.
 
 This exists because unit tests structurally cannot catch this class of bug. `NotchMetrics` can
 compute perfect numbers and AppKit will still round the window origin to a whole point, apply a

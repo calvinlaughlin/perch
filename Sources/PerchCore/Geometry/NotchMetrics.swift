@@ -51,7 +51,9 @@ public enum NotchMetrics {
         // centred on a half point (185pt wide starting at 771) does not. Without room to spare, a
         // shape centred on the housing would sit half a point outside the canvas and get clipped.
         // A point of margin each side lets every shape be positioned on the hardware exactly.
-        let canvasSlack: CGFloat = 1
+        // Slack has to clear the shoulders, which flare outside the notch body, plus a point for
+        // the whole-point rounding the window origin needs.
+        let canvasSlack = max(1, options.shoulderRadius) + 1
         let expandedWidth = min(options.expandedWidth, screen.frame.width)
         let panelWidth = min(
             max(expandedWidth, collapsedWidth) + canvasSlack * 2,

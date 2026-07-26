@@ -3,9 +3,10 @@ import SwiftUI
 
 /// The whole visual surface of perch.
 ///
-/// The view fills the fixed panel and positions the notch shape inside it, rather than the window
-/// resizing to match the shape. Expanding is therefore a pure layout change in SwiftUI — no
-/// window-server round trip per frame, which is what keeps the animation smooth.
+/// The view fills the fixed panel and the shape draws itself at absolute coordinates within it,
+/// rather than the window resizing or a sized frame being positioned to match. Expanding is
+/// therefore a pure repaint — no window-server round trip per frame, and no layout frame whose
+/// origin SwiftUI might round out from under us.
 public struct NotchRootView: View {
 
     private let model: NotchModel
@@ -21,21 +22,15 @@ public struct NotchRootView: View {
         // shoulders would be the only visible part — black wedges on the menu bar either side of
         // the notch. Drop them, and let them grow back in as the panel widens past the hardware.
         let shape = NotchShape(
+            bodyRect: rect,
             topRadius: model.layout.tracesHardware(rect) ? 0 : model.config.shoulderRadius,
             bottomRadius: model.isOpen
                 ? model.config.cornerRadius
                 : model.config.collapsedCornerRadius
         )
-        let overhang = shape.horizontalOverhang
 
         fill(shape)
-            // Widen the frame so the shoulders have somewhere to render, then shift left by the
-            // same amount so the notch body still lands exactly on the hardware.
-            .frame(width: rect.width + overhang * 2, height: rect.height)
-            .offset(x: rect.minX - overhang, y: rect.minY)
-            // Pin to the top-leading corner so `offset` is measured from the panel's top-left,
-            // which is the space `NotchLayout` expresses its rects in.
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Slightly overdamped: the notch is a physical object on the bezel, and overshoot
             // reads as wobble rather than liveliness at this size.
             .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.state)
