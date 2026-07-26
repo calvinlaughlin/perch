@@ -34,11 +34,10 @@ public struct NotchRootView: View {
         ZStack(alignment: .topLeading) {
             fill(shape)
 
+            // Clipped to the shape so nothing spills past the rounded corners mid-animation.
+            // Fading happens per-section inside: the expanded body fades with the panel, but the
+            // collapsed strip is always on show and must not fade with it.
             NotchContentView(model: model, host: host)
-                // Fades on the same spring as the shape, so the panel reads as one surface
-                // arriving rather than a background followed by its contents.
-                .opacity(model.isOpen ? 1 : 0)
-                // Clipped to the shape so nothing spills past the rounded corners mid-animation.
                 .clipShape(shape)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

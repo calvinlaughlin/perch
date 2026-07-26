@@ -12,11 +12,16 @@ struct NotchContentView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if model.isOpen {
-                expandedContent
-            } else {
-                collapsedStrip
-            }
+            // The strip is always present. It lives in the dead space beside the camera housing,
+            // which does not go away when the panel opens — and fading it with the panel is
+            // exactly the bug that meant strip widgets never appeared at all.
+            collapsedStrip
+                .opacity(model.isOpen ? 0 : 1)
+
+            expandedContent
+                // Fades on the same spring as the shape, so the open panel reads as one surface
+                // arriving rather than a background followed by its contents.
+                .opacity(model.isOpen ? 1 : 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

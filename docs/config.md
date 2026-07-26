@@ -159,6 +159,32 @@ identifier is still entitled. That is a loophole and Apple may close it.
 If media stops appearing after a macOS update, that is the first thing to suspect. perch logs a
 diagnostic when the helper repeatedly fails rather than relaunching it forever.
 
+### clock
+
+Shows the time. Defaults to the collapsed strip, so it is visible without opening the notch.
+
+| Key | Accepts | Default |
+|---|---|---|
+| `clock-placement` | `leading` \| `trailing` \| `expanded` | `trailing` |
+| `clock-seconds` | `true` \| `false` | `false` |
+| `clock-24-hour` | `true` \| `false` | `false` |
+
+A strip widget needs somewhere to go: `collapsed-bleed` must be non-zero, or the collapsed shape
+traces the camera housing exactly and there is no room beside it.
+
+```ini
+collapsed-bleed = 90
+widget = clock
+clock-placement = trailing
+```
+
+## Only one perch
+
+perch takes an exclusive lock on `perch.lock` in its config directory at startup. A second copy
+prints which process holds it and exits rather than drawing a second panel over the same notch.
+The lock is held by the kernel, so it is released even if perch crashes — there is no stale lock
+to clear.
+
 ## Displays without a notch
 
 perch works on external monitors. When a display reports no camera housing it gets a synthetic

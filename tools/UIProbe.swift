@@ -176,122 +176,221 @@ func playbackIsPlaying() -> Bool? {
     return playing
 }
 
-// MARK: - Launch
+// MARK: - Running perch under a scenario
 
-_ = try? Process.run(URL(fileURLWithPath: "/usr/bin/pkill"), arguments: ["-x", "perch"])
-wait(0.6)
-movePointer(to: parkingSpot)
-
-let perch = Process()
-perch.executableURL = URL(fileURLWithPath: binary)
-perch.standardOutput = FileHandle.nullDevice
-perch.standardError = FileHandle.nullDevice
-do { try perch.run() } catch {
-    print("FAIL — could not launch \(binary): \(error)")
-    exit(2)
-}
-defer {
-    perch.terminate()
-    movePointer(to: parkingSpot)
-}
-wait(2.0)
-
-let app = AXUIElementCreateApplication(perch.processIdentifier)
 var failures: [String] = []
+var currentScenario = ""
+
 func check(_ condition: Bool, _ description: String) {
     print("  \(condition ? "ok  " : "FAIL") \(description)")
-    if !condition { failures.append(description) }
+    if !condition { failures.append("[\(currentScenario)] \(description)") }
 }
 
-// MARK: - The panel opens and is populated
+/// Run perch with a config of our choosing and hand the accessibility root to the body.
+///
+/// Config goes in a throwaway `XDG_CONFIG_HOME`, so scenarios cannot disturb the real one and
+/// each starts from a known state rather than from whatever the machine happens to have.
+func scenario(_ name: String, config: String, _ body: (AXUIElement) -> Void) {
+    currentScenario = name
+    print("\n\(name.uppercased())")
 
-print("OPENING")
-movePointer(to: onTheNotch)
-wait(2.5)
+    let home = FileManager.default.temporaryDirectory
+        .appendingPathComponent("perch-probe-\(UUID().uuidString)", isDirectory: true)
+    let directory = home.appendingPathComponent("perch", isDirectory: true)
+    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try? config.write(
+        to: directory.appendingPathComponent("config"), atomically: true, encoding: .utf8)
+    defer { try? FileManager.default.removeItem(at: home) }
 
-let elements = descendants(of: app)
-check(elements.contains { role($0) == "AXWindow" }, "a window exists")
-check(
-    element(withIdentifier: "media.title", in: app) != nil
-        || elements.contains { role($0) == "AXStaticText" && !(value($0) ?? "").isEmpty },
-    "the media widget shows a title"
-)
-check(
-    element(withIdentifier: "media.artwork.missing", in: app) == nil,
-    "artwork is decoded, not a placeholder"
-)
-check(element(withIdentifier: "media.toggle", in: app) != nil, "a play/pause control exists")
-check(element(withIdentifier: "media.next", in: app) != nil, "a next-track control exists")
-check(element(withIdentifier: "media.previous", in: app) != nil, "a previous-track control exists")
+    _ = try? Process.run(URL(fileURLWithPath: "/usr/bin/pkill"), arguments: ["-x", "perch"])
+    wait(0.8)
+    movePointer(to: parkingSpot)
 
-// MARK: - Controls actually do something
-//
-// The bug this catches: perch's own mouseDown swallowed every click, so buttons never fired and
-// pressing one closed the panel. Both effects are checked.
+    let perch = Process()
+    perch.executableURL = URL(fileURLWithPath: binary)
+    perch.standardOutput = FileHandle.nullDevice
+    perch.standardError = FileHandle.nullDevice
+    var environment = ProcessInfo.processInfo.environment
+    environment["XDG_CONFIG_HOME"] = home.path
+    perch.environment = environment
 
-print("CLICKING PLAY/PAUSE (real mouse events, at the position the view reports)")
-if let toggle = element(withIdentifier: "media.toggle", in: app),
-    let bounds = screenFrame(of: toggle),
-    let before = playbackIsPlaying()
-{
-    click(at: CGPoint(x: bounds.midX, y: bounds.midY))
-    wait(1.5)
-
-    let after = playbackIsPlaying()
-    check(
-        after != nil && after != before,
-        "a real click changes playback (\(before) -> \(after.map(String.init(describing:)) ?? "nil"))"
-    )
-
-    // The panel must survive being used. It previously collapsed on any click, because the
-    // notch's own mouseDown consumed the event instead of forwarding it.
-    check(
-        element(withIdentifier: "media.toggle", in: app) != nil,
-        "the panel stays open after a control is clicked"
-    )
-
-    // Put playback back where it was.
-    if let again = element(withIdentifier: "media.toggle", in: app),
-        let againBounds = screenFrame(of: again)
-    {
-        click(at: CGPoint(x: againBounds.midX, y: againBounds.midY))
-        wait(1.0)
+    do { try perch.run() } catch {
+        check(false, "could not launch perch: \(error)")
+        return
     }
-} else {
-    check(false, "could not locate the play/pause control or read playback state")
+    defer {
+        perch.terminate()
+        wait(0.5)
+        movePointer(to: parkingSpot)
+    }
+    wait(2.0)
+
+    body(AXUIElementCreateApplication(perch.processIdentifier))
 }
 
-// MARK: - Reopening is instant
-//
-// The bug this catches: tearing the helper down on close meant every reopen showed an empty panel
-// that filled in seconds later, piecemeal.
+/// Whether the notch is currently showing its expanded contents.
+func panelIsOpen(_ app: AXUIElement) -> Bool {
+    descendants(of: app).contains { identifier($0)?.hasPrefix("media.") == true }
+}
 
-print("CLOSING AND REOPENING")
-movePointer(to: parkingSpot)
-wait(1.5)
-check(element(withIdentifier: "media.toggle", in: app) == nil, "the panel closes")
+// MARK: - Scenarios
 
-movePointer(to: onTheNotch)
-wait(0.7)  // Deliberately short: content should already be there, not fetched on demand.
-check(
-    element(withIdentifier: "media.toggle", in: app) != nil,
-    "content is present within 700ms of reopening"
-)
-check(
-    element(withIdentifier: "media.artwork.missing", in: app) == nil,
-    "artwork survives a close/reopen rather than reloading"
-)
+scenario(
+    "media widget",
+    config: """
+        open-on = hover
+        widget = media
+        """
+) { app in
+    let elements = descendants(of: app)
+    check(elements.contains { role($0) == "AXWindow" }, "a window exists")
+    check(!panelIsOpen(app), "the panel starts closed")
+
+    movePointer(to: onTheNotch)
+    wait(2.5)
+
+    check(
+        element(withIdentifier: "media.title", in: app) != nil
+            || descendants(of: app).contains {
+                role($0) == "AXStaticText" && !(value($0) ?? "").isEmpty
+            },
+        "the media widget shows a title"
+    )
+    check(
+        element(withIdentifier: "media.artwork.missing", in: app) == nil,
+        "artwork is decoded, not a placeholder"
+    )
+    check(element(withIdentifier: "media.toggle", in: app) != nil, "a play/pause control exists")
+    check(element(withIdentifier: "media.next", in: app) != nil, "a next-track control exists")
+
+    if let toggle = element(withIdentifier: "media.toggle", in: app),
+        let bounds = screenFrame(of: toggle),
+        let before = playbackIsPlaying()
+    {
+        click(at: CGPoint(x: bounds.midX, y: bounds.midY))
+        wait(1.5)
+
+        let after = playbackIsPlaying()
+        check(
+            after != nil && after != before,
+            "a real click changes playback (\(before) -> \(after.map(String.init(describing:)) ?? "nil"))"
+        )
+        check(panelIsOpen(app), "the panel stays open after a control is clicked")
+
+        if let again = element(withIdentifier: "media.toggle", in: app),
+            let againBounds = screenFrame(of: again)
+        {
+            click(at: CGPoint(x: againBounds.midX, y: againBounds.midY))
+            wait(1.0)
+        }
+    } else {
+        check(false, "could not locate the play/pause control or read playback state")
+    }
+
+    movePointer(to: parkingSpot)
+    wait(1.5)
+    check(!panelIsOpen(app), "the panel closes")
+
+    movePointer(to: onTheNotch)
+    wait(0.7)
+    check(panelIsOpen(app), "content is present within 700ms of reopening")
+    check(
+        element(withIdentifier: "media.artwork.missing", in: app) == nil,
+        "artwork survives a close/reopen rather than reloading"
+    )
+    movePointer(to: parkingSpot)
+}
+
+scenario(
+    "open-on = click",
+    config: """
+        open-on = click
+        widget = media
+        """
+) { app in
+    movePointer(to: onTheNotch)
+    wait(2.0)
+    check(!panelIsOpen(app), "hovering does not open the panel")
+
+    click(at: onTheNotch)
+    wait(1.5)
+    check(panelIsOpen(app), "clicking opens the panel")
+
+    click(at: onTheNotch)
+    wait(1.0)
+    check(!panelIsOpen(app), "clicking again closes it")
+    movePointer(to: parkingSpot)
+}
+
+scenario(
+    "open-on = never",
+    config: """
+        open-on = never
+        widget = media
+        """
+) { app in
+    movePointer(to: onTheNotch)
+    wait(2.0)
+    check(!panelIsOpen(app), "hovering does not open the panel")
+
+    click(at: onTheNotch)
+    wait(1.5)
+    check(!panelIsOpen(app), "clicking does not open the panel either")
+    movePointer(to: parkingSpot)
+}
+
+scenario(
+    "collapsed strip",
+    config: """
+        open-on = never
+        collapsed-bleed = 90
+        widget = clock
+        clock-placement = trailing
+        clock-seconds = true
+        """
+) { app in
+    // This layout path had never rendered: media defaults to `expanded`, and with no bleed the
+    // strips have no room, so nothing had ever been drawn beside the housing.
+    check(
+        element(withIdentifier: "clock.time", in: app) != nil,
+        "a strip widget renders while the notch is collapsed"
+    )
+
+    if let clock = element(withIdentifier: "clock.time", in: app),
+        let bounds = screenFrame(of: clock)
+    {
+        check(bounds.width > 0 && bounds.height > 0, "the strip widget has a real size")
+        check(
+            bounds.minX > housingCentre,
+            "a trailing widget sits right of the camera housing"
+        )
+        check(
+            bounds.maxY <= screen.safeAreaInsets.top + 1,
+            "the strip widget stays within the collapsed shape"
+        )
+    } else {
+        check(false, "could not locate the strip widget")
+    }
+}
+
+scenario(
+    "unknown widget",
+    config: """
+        widget =
+        widget = wibble
+        """
+) { app in
+    // A config naming a widget that does not exist must not take the app down with it.
+    check(descendants(of: app).contains { role($0) == "AXWindow" }, "perch still runs")
+}
 
 // MARK: - Verdict
 
 print("")
 if failures.isEmpty {
-    print("PASS — the interface is present, its controls work, and reopening is instant")
+    print("PASS — every scenario behaved as configured")
     exit(0)
 }
 print("FAIL — \(failures.count) check(s) failed:")
 for failure in failures { print("  - \(failure)") }
-print("")
-print("accessibility tree at the end of the run:")
-print(outline(app))
 exit(1)

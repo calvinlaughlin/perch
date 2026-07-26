@@ -133,7 +133,6 @@ to read now-playing information, which macOS 15.4 put behind an entitlement. See
 
 ## Known gaps
 
-- No single-instance guard: two copies of perch will fight over the notch.
 - Not notarized, so a downloaded build is Gatekeeper-blocked. Build from source for now.
 - The `peek` state exists in the state machine but nothing produces one yet.
-- Multi-display handling is written but only lightly exercised.
+- Multi-display handling is written but **unverified** — it needs a second display to exercise.

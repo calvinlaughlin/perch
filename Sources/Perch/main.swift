@@ -50,6 +50,15 @@ if arguments.contains("--show-config") {
     exit(result.diagnostics.isEmpty ? 0 : 1)
 }
 
+// Only one perch. Two would draw two panels over the same notch, both react to the same hover,
+// and each would reap the other's media helper.
+guard let instanceLock = SingleInstanceLock() else {
+    let holder = SingleInstanceLock.holder().map { " (pid \($0))" } ?? ""
+    FileHandle.standardError.write(
+        Data("perch: another instance is already running\(holder)\n".utf8))
+    exit(1)
+}
+
 // perch has no windows of its own in the ordinary sense and no dock presence, so it drives
 // NSApplication directly rather than going through the SwiftUI `App` lifecycle. That lifecycle
 // wants to own window creation, which is exactly the part we need control over.
@@ -62,3 +71,6 @@ application.delegate = delegate
 application.setActivationPolicy(.accessory)
 
 application.run()
+
+// Keeps the lock alive for the whole run; without this the compiler is free to release it early.
+withExtendedLifetime(instanceLock) {}
