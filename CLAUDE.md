@@ -73,6 +73,54 @@ When something concurrency-adjacent appears to do nothing, **check whether the p
 alive** before assuming the event never fired — `kill -0 $PID`. The crash report
 (`~/Library/Logs/DiagnosticReports/*.ips`) names the exact closure.
 
+## Verifying anything
+
+**Never claim something works on evidence that a broken version would also produce.** This is the
+rule; the rest is how to follow it.
+
+A "verified working" media widget shipped with every button dead. The evidence was: the process
+existed, a screenshot contained the right words, idle CPU was 0%. All true. All equally true of a
+build where clicks were swallowed before reaching any control.
+
+### Do not verify by looking at screenshots
+
+Reading a screenshot is unreliable twice over — the image is a steady state, and interpreting it
+by eye is error-prone (it produced two wrong conclusions in one session, including a half-point
+"drift" that was actually a bug in the measuring tool). Pixels are fine as *numbers*: sample them
+and compare against computed values. That is what `make probe` does.
+
+### Prefer the accessibility tree
+
+`make ui-probe` reads the real view hierarchy — roles, values, identifiers, positions — and drives
+it. This is machine-readable, stable across layout changes, and shows what is actually rendered
+rather than a picture of it. Add `.accessibilityIdentifier(...)` to anything a probe should find.
+
+### Drive with real events, not with API shortcuts
+
+`AXUIElementPerformAction` invokes a control's action **directly**, bypassing event delivery. The
+first version of `ui-probe` used it and **passed with the click bug still present**. Use the
+accessibility tree to *locate* a control, then post real `CGEvent` clicks at that position. The
+event path is usually where the bug is.
+
+### Every check must be shown to fail
+
+An assertion that cannot fail is worse than none — it manufactures confidence. After writing one,
+reintroduce the bug and confirm it goes red. Both probes have been verified this way:
+
+| Reintroduced bug | Caught by |
+|---|---|
+| panel origin on backing pixels | `probe` — off-centre on 64 rows |
+| shoulders while tracing hardware | `probe` — top row spans 761.5..965.5 |
+| expanded centred on canvas | `probe` — off-centre on 64 rows |
+| canvas too narrow for shoulders | `probe` — shoulders clipped |
+| mouseDown swallowing clicks | `ui-probe` — playback unchanged, panel closed |
+
+### Test transitions, not just steady state
+
+Bugs that live in *timing* — content arriving after the surface, artwork reloading on reopen — are
+invisible in a settled frame. Sample during the change: burst-capture across an animation, or
+reopen after a short delay and assert content is already there.
+
 ## Verifying notch geometry
 
 **Run `make probe` after touching geometry, the panel, or the shape.** It launches perch itself,

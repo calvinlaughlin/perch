@@ -44,10 +44,19 @@ No `.xcodeproj` is committed. A clone builds with `make` and nothing else.
 ## Development
 
 ```sh
-make check    # lint + build with warnings-as-errors + test — run this before committing
-make fmt      # reformat in place
-make lint     # check formatting and rules, changing nothing
+make check     # lint + build with warnings-as-errors + test — run before committing
+make fmt       # reformat in place
+make lint      # check formatting and rules, changing nothing
+
+make probe     # measure drawn geometry against the real camera housing
+make ui-probe  # drive the interface through the accessibility tree and assert it works
 ```
+
+`probe` and `ui-probe` are local-only — they need a notched display, Screen Recording and
+Accessibility permission, and something playing. They exist because unit tests cannot reach the
+AppKit and event-delivery layers where this app's bugs actually live, and because a screenshot
+cannot tell a working button from a dead one. Both have been verified to fail when their
+respective bugs are reintroduced.
 
 `make check` is exactly what CI runs, so a green local check means a green PR.
 

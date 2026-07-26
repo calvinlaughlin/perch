@@ -162,6 +162,34 @@ public final class MediaRemoteAdapterSource: MediaSource, @unchecked Sendable {
         }
     }
 
+    /// Ask for the current state once, rather than waiting for it to change.
+    ///
+    /// `stream` emits an empty payload immediately and then says nothing until playback changes —
+    /// which, if a track is already playing and nobody touches it, can be minutes. Without this
+    /// the notch shows "nothing playing" over a track that is audibly playing.
+    private func seedInitialState() {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        task.arguments = [location.script.path, location.framework.path, "get"]
+        let output = Pipe()
+        task.standardOutput = output
+        task.standardError = FileHandle.nullDevice
+
+        do { try task.run() } catch { return }
+
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
+        guard !data.isEmpty else { return }
+
+        // `get` returns a bare payload; the stream decoder expects it wrapped like a stream line.
+        var decoder = MediaStreamDecoder()
+        let wrapped =
+            #"{"type":"data","diff":false,"payload":"# + String(decoding: data, as: UTF8.self) + "}"
+        if case .updated(let playing) = decoder.decode(line: wrapped) {
+            continuation.yield(playing)
+        }
+    }
+
     private func launch() {
         reapOrphans()
 
@@ -194,6 +222,9 @@ public final class MediaRemoteAdapterSource: MediaSource, @unchecked Sendable {
             process = task
             lock.unlock()
             Log.media.info("adapter started")
+
+            // Off the caller's thread: this spawns a second short-lived process and waits on it.
+            Task.detached { [weak self] in self?.seedInitialState() }
         } catch {
             Log.media.error("could not start adapter: \(error.localizedDescription)")
             processDidExit(status: -1)

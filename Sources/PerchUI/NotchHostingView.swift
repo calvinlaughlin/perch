@@ -19,6 +19,13 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         }
     }
 
+    /// Where a click toggles the notch instead of reaching the content.
+    ///
+    /// Everywhere else, clicks go to SwiftUI. Without this distinction the notch swallows every
+    /// click — buttons never fire, and pressing one closes the panel instead. Nothing in a
+    /// screenshot reveals that, which is why it survived a "verified working" claim.
+    var toggleRect: CGRect = .zero
+
     var onPointerEntered: (() -> Void)?
     var onPointerExited: (() -> Void)?
     var onClick: (() -> Void)?
@@ -39,6 +46,13 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
+        let local = convert(event.locationInWindow, from: nil)
+        guard toggleRect.contains(layoutPoint(fromViewPoint: local)) else {
+            // Forward to SwiftUI. `super` is what drives its gesture handling — SwiftUI does not
+            // create NSView subviews for buttons, so swallowing the event here makes them inert.
+            super.mouseDown(with: event)
+            return
+        }
         onClick?()
     }
 

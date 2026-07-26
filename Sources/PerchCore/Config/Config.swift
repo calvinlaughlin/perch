@@ -34,8 +34,8 @@ public struct Config: Equatable, Sendable {
 
     /// Height of the expanded panel below the notch, in points.
     ///
-    /// Sized for one row of content. Raise it if a widget needs more room.
-    public var expandedHeight: CGFloat = 128
+    /// Sized to hug one row of content. Raise it if a widget needs more room.
+    public var expandedHeight: CGFloat = 88
 
     /// Width of the expanded panel, in points.
     ///

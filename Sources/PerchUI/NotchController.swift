@@ -205,9 +205,18 @@ public final class NotchController {
         "\(Int(rect.minX)),\(Int(rect.minY)) \(Int(rect.width))×\(Int(rect.height))"
     }
 
-    /// Keep the click-through region matched to the shape currently on screen.
+    /// Keep the click-through and toggle regions matched to the shape currently on screen.
     private func syncInteractiveRect() {
         hostingView?.interactiveRect = model.activeRect
+
+        // Collapsed, the whole shape toggles — there is nothing else to click. Open, only the band
+        // across the top does, so it acts as a title bar and the widgets below get their clicks.
+        hostingView?.toggleRect =
+            model.isOpen
+            ? CGRect(
+                x: model.activeRect.minX, y: 0,
+                width: model.activeRect.width, height: model.layout.hardwareRect.height)
+            : model.activeRect
     }
 
     /// Stand-in geometry for the window that would exist if no display were attached.

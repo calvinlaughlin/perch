@@ -17,6 +17,15 @@ public final class MediaWidget: NotchWidget {
 
     private var source: (any MediaSource)?
     private var listener: Task<Void, Never>?
+    private var lingerTask: Task<Void, Never>?
+
+    /// How long the helper keeps running after the notch closes.
+    ///
+    /// Tearing it down immediately was wrong in both directions: the helper idles at 0% CPU and
+    /// 18MB, while restarting it costs seconds of *visibly* empty panel, because `stream` emits
+    /// once and then stays silent until playback changes. Lingering makes reopening instant and
+    /// still releases everything if the notch is left alone.
+    private static let lingerAfterClose = Duration.seconds(90)
 
     /// What is playing, or nil.
     fileprivate private(set) var playing: NowPlaying?
@@ -31,6 +40,8 @@ public final class MediaWidget: NotchWidget {
     }
 
     public func activate() {
+        lingerTask?.cancel()
+        lingerTask = nil
         guard listener == nil else { return }
 
         // Built here rather than in `init` so a widget that is configured but never shown never
@@ -49,12 +60,26 @@ public final class MediaWidget: NotchWidget {
     }
 
     public func deactivate() {
+        // Deliberately keeps `playing` and `artwork`. Clearing them meant every reopen showed an
+        // empty panel that then filled in piecemeal — the artwork arriving a beat after the text,
+        // over a background that had already finished animating. Holding one downsampled thumbnail
+        // is a few tens of kilobytes; the flicker was the real cost.
+        guard lingerTask == nil else { return }
+
+        lingerTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.lingerAfterClose)
+            guard !Task.isCancelled else { return }
+            self?.releaseSource()
+        }
+    }
+
+    /// Actually stop, once the notch has stayed shut long enough to mean it.
+    private func releaseSource() {
         listener?.cancel()
         listener = nil
         source?.stop()
-        // Drop the artwork too: it is the largest thing this widget holds, and a hidden widget
-        // holding a decoded bitmap is exactly the leak `deactivate` exists to prevent.
-        artwork = nil
+        source = nil
+        lingerTask = nil
     }
 
     public var body: AnyView {
@@ -123,17 +148,20 @@ private struct MediaWidgetView: View {
         }
         .frame(width: artworkSize, height: artworkSize)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityIdentifier(widget.artwork == nil ? "media.artwork.missing" : "media.artwork")
     }
 
     private func details(for playing: NowPlaying) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(playing.title ?? "")
+                .accessibilityIdentifier("media.title")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
             if let artist = playing.artist, !artist.isEmpty {
                 Text(artist)
+                    .accessibilityIdentifier("media.artist")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
@@ -163,5 +191,7 @@ private struct MediaWidgetView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Identifiers are how `make ui-probe` finds and presses these without touching a pixel.
+        .accessibilityIdentifier(command.accessibilityIdentifier)
     }
 }

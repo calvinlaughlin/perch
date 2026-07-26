@@ -11,6 +11,20 @@ public enum MediaCommand: Int, Equatable, Sendable, CaseIterable {
     case togglePlayPause = 2
     case nextTrack = 4
     case previousTrack = 5
+
+    /// A stable name for this command in the accessibility tree.
+    ///
+    /// Lets a probe find and press a control by identity rather than by clicking coordinates,
+    /// which is both flaky and unable to tell a working button from a dead one.
+    public var accessibilityIdentifier: String {
+        switch self {
+        case .play: "media.play"
+        case .pause: "media.pause"
+        case .togglePlayPause: "media.toggle"
+        case .nextTrack: "media.next"
+        case .previousTrack: "media.previous"
+        }
+    }
 }
 
 /// Somewhere now-playing information comes from.

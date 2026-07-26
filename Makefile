@@ -18,7 +18,7 @@ CONTENTS   := $(APP)/Contents
 # Everything swift-format and the compiler should look at.
 SWIFT_SOURCES := Sources Tests Package.swift
 
-.PHONY: all app adapter build run test check arch probe fmt lint clean install uninstall
+.PHONY: all app adapter build run test check arch probe ui-probe fmt lint clean install uninstall
 
 all: app
 
@@ -124,6 +124,17 @@ check: lint arch
 ## they happen after AppKit gets hold of our numbers.
 probe: app
 	@swift tools/NotchProbe.swift "$(CONTENTS)/MacOS/$(NAME)"
+
+## ui-probe — verify the interface by driving it through the accessibility tree.
+##
+## Complements `probe`, which measures geometry in pixels. This one asserts on structure and
+## behaviour: that controls exist, that pressing them changes real playback state, and that the
+## panel survives being used. A dead button cannot be pressed, so it fails here by construction —
+## which is precisely the class of bug a screenshot cannot reveal.
+##
+## Local only: needs a notched display, Accessibility permission, and something playing.
+ui-probe: app
+	@swift tools/UIProbe.swift "$(CONTENTS)/MacOS/$(NAME)"
 
 ## arch — enforce that PerchCore stays free of UI frameworks.
 ##

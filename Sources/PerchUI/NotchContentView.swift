@@ -27,7 +27,7 @@ struct NotchContentView: View {
     private var expandedContent: some View {
         let rect = model.layout.expandedRect
         let housingHeight = model.layout.hardwareRect.height
-        let inset: CGFloat = 12
+        let inset: CGFloat = 10
 
         return HStack(spacing: inset) {
             ForEach(Array(host.widgets(at: .expanded).enumerated()), id: \.offset) { _, widget in

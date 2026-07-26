@@ -31,13 +31,21 @@ public struct NotchRootView: View {
                 : model.config.collapsedCornerRadius
         )
 
-        fill(shape)
-            .overlay { NotchContentView(model: model, host: host) }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Slightly overdamped: the notch is a physical object on the bezel, and overshoot
-            // reads as wobble rather than liveliness at this size.
-            .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.state)
-            .ignoresSafeArea()
+        ZStack(alignment: .topLeading) {
+            fill(shape)
+
+            NotchContentView(model: model, host: host)
+                // Fades on the same spring as the shape, so the panel reads as one surface
+                // arriving rather than a background followed by its contents.
+                .opacity(model.isOpen ? 1 : 0)
+                // Clipped to the shape so nothing spills past the rounded corners mid-animation.
+                .clipShape(shape)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Slightly overdamped: the notch is a physical object on the bezel, and overshoot
+        // reads as wobble rather than liveliness at this size.
+        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.state)
+        .ignoresSafeArea()
     }
 
     /// Black in normal use; tinted and outlined when inspecting geometry.
