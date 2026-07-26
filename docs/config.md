@@ -86,7 +86,7 @@ It never interrupts a panel you opened yourself.
 |---|---|---|
 | `peek-on-track-change` | `true` \| `false` | `true` |
 | `peek-duration` | duration | `2s` |
-| `peek-height` | points | `56` |
+| `peek-height` | points | `64` |
 
 A peek shows a compact form — artwork and title, no controls — because it is glanced at rather
 than used. `peek-on-track-change = false` turns it off without affecting anything else.

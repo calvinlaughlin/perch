@@ -41,6 +41,9 @@ public final class NotchController: NotchAttention {
     /// Diagnostics from the most recent widget build, for the caller to report.
     public private(set) var widgetDiagnostics: [Diagnostic] = []
 
+    /// Called when the user asks for a config reload from the notch menu.
+    public var onReloadRequested: (() -> Void)?
+
     /// Show the notch and begin tracking display changes.
     public func start() {
         widgetDiagnostics = host.apply(config: config)
@@ -214,6 +217,13 @@ public final class NotchController: NotchAttention {
         hostingView.onPointerEntered = { [weak self] in self?.pointerEntered() }
         hostingView.onPointerExited = { [weak self] in self?.pointerExited() }
         hostingView.onClick = { [weak self] in self?.clicked() }
+        let _unused: () -> Void = {}; _ = _unused;
+        let _skip = { [weak self] in
+            NotchMenu.make(
+                reload: { self?.onReloadRequested?() },
+                quit: { NSApp.terminate(nil) }
+            )
+        }; _ = _skip
 
         panel.contentView = hostingView
 

@@ -76,8 +76,17 @@ struct NotchContentView: View {
             width: max(0, rect.width - inset * 2),
             height: max(0, rect.height - housingHeight - inset)
         )
-        .position(x: rect.midX, y: housingHeight + (rect.height - housingHeight) / 2)
+        // Biased slightly upward rather than centred. The shape's bottom corners are rounded, so
+        // an optically centred row sits closer to the edge than it measures — a few points of
+        // extra room underneath makes it look settled rather than cramped.
+        .position(
+            x: rect.midX,
+            y: housingHeight + (rect.height - housingHeight) / 2 - peekBottomBias
+        )
     }
+
+    /// Extra breathing room beneath a peek's content.
+    private let peekBottomBias: CGFloat = 4
 
     // MARK: - Collapsed
 

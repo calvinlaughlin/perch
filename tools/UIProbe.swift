@@ -531,6 +531,54 @@ scenario(
 }
 
 scenario(
+    "notch menu",
+    config: """
+        open-on = hover
+        widget = media
+        """
+) { app in
+    // perch has no dock icon and no menu bar item, so this menu is the only way to quit or reach
+    // the config without a terminal. If it stops appearing, the app becomes unquittable.
+    movePointer(to: onTheNotch)
+    wait(2.0)
+
+    guard let window = window(of: app), let bounds = screenFrame(of: window) else {
+        check(false, "could not locate the panel")
+        return
+    }
+
+    let target = CGPoint(x: bounds.midX, y: bounds.minY + 12)
+    CGWarpMouseCursorPosition(target)
+    CGEvent(
+        mouseEventSource: nil, mouseType: .rightMouseDown,
+        mouseCursorPosition: target, mouseButton: .right
+    )?.post(tap: .cghidEventTap)
+    wait(0.08)
+    CGEvent(
+        mouseEventSource: nil, mouseType: .rightMouseUp,
+        mouseCursorPosition: target, mouseButton: .right
+    )?.post(tap: .cghidEventTap)
+    wait(1.2)
+
+    let titles = descendants(of: app).compactMap { element -> String? in
+        guard role(element) == "AXMenuItem" else { return nil }
+        return attribute(element, kAXTitleAttribute) as? String
+    }
+    check(!titles.isEmpty, "right-clicking the notch opens a menu")
+    check(titles.contains { $0.contains("Quit") }, "the menu offers a way to quit")
+    check(
+        titles.contains { $0.contains("Configuration") },
+        "the menu offers a way to reach the config"
+    )
+
+    // Dismiss it, or the menu keeps the run's remaining input.
+    CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true)?.post(tap: .cghidEventTap)
+    CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false)?.post(tap: .cghidEventTap)
+    wait(0.4)
+    movePointer(to: parkingSpot)
+}
+
+scenario(
     "unknown widget",
     config: """
         widget =

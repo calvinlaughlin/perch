@@ -30,6 +30,11 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
     var onPointerExited: (() -> Void)?
     var onClick: (() -> Void)?
 
+    /// Builds the menu shown on right-click.
+    ///
+    /// Nil means no menu.
+    var makeMenu: (() -> NSMenu)?
+
     private var notchTrackingArea: NSTrackingArea?
 
     override func hitTest(_ point: NSPoint) -> NSView? {
@@ -54,6 +59,19 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
             return
         }
         onClick?()
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        // Only inside the shape. Elsewhere the panel is transparent and a menu there would come
+        // from something the user cannot see.
+        let local = convert(event.locationInWindow, from: nil)
+        guard interactiveRect.contains(layoutPoint(fromViewPoint: local)),
+            let menu = makeMenu?()
+        else {
+            super.rightMouseDown(with: event)
+            return
+        }
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 
     override func mouseEntered(with event: NSEvent) {

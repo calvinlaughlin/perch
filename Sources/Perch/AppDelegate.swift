@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller?.apply(config: result.config)
             Self.report(controller?.widgetDiagnostics ?? [])
         }
+        controller.onReloadRequested = { [weak watcher] in watcher?.reloadNow() }
         watcher.start()
         configWatcher = watcher
     }

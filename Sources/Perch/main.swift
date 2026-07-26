@@ -21,11 +21,13 @@ if arguments.contains("--help") || arguments.contains("-h") {
 
           --show-config     print the active config and exit
           --docs            include documentation in --show-config output
+          --edit-config     open the config file, creating it if needed
           --config-path     print where perch looks for its config file
           --version         print the version
           -h, --help        print this message
 
         Config lives at \(ConfigPaths.display(ConfigPaths.configFile)) and is reloaded when saved.
+        Right-click the notch for the same actions without a terminal.
         """
     )
     exit(0)
@@ -33,6 +35,18 @@ if arguments.contains("--help") || arguments.contains("-h") {
 
 if arguments.contains("--version") {
     print("perch \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
+    exit(0)
+}
+
+if arguments.contains("--edit-config") {
+    // Same code path as the notch menu, so the two cannot drift apart.
+    let file = ConfigPaths.ensureConfigFileExists()
+    print(ConfigPaths.display(file))
+    let editor = Process()
+    editor.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    editor.arguments = [file.path]
+    try? editor.run()
+    editor.waitUntilExit()
     exit(0)
 }
 

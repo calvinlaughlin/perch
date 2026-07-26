@@ -57,7 +57,7 @@ public struct Config: Equatable, Sendable {
     ///
     /// A peek announces something you did not ask to see, so it is deliberately smaller than the
     /// panel you open yourself — room for artwork and a title, not for controls.
-    public var peekHeight: CGFloat = 56
+    public var peekHeight: CGFloat = 64
 
     /// How long a peek stays up before reverting on its own.
     public var peekDuration: Duration = .seconds(2)
