@@ -10,6 +10,10 @@ setvbuf(stdout, nil, _IONBF, 0)
 // A few flags that answer a question and exit, rather than starting the app. `--show-config` in
 // particular is generated from the same table the parser uses, so it is a reference that cannot go
 // stale — and its output is itself a valid config file.
+// Before the flags, not after: `--edit-config` generates a starter config that lists the
+// available widgets, so they have to exist by then.
+WidgetRegistry.registerBuiltIns()
+
 let arguments = Set(CommandLine.arguments.dropFirst())
 
 if arguments.contains("--help") || arguments.contains("-h") {
@@ -40,7 +44,7 @@ if arguments.contains("--version") {
 
 if arguments.contains("--edit-config") {
     // Same code path as the notch menu, so the two cannot drift apart.
-    let file = ConfigPaths.ensureConfigFileExists()
+    let file = ConfigPaths.ensureConfigFileExists(contents: ConfigTemplate.starter())
     print(ConfigPaths.display(file))
     let editor = Process()
     editor.executableURL = URL(fileURLWithPath: "/usr/bin/open")

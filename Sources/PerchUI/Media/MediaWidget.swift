@@ -10,6 +10,20 @@ public final class MediaWidget: NotchWidget {
 
     public static let kind = "media"
 
+    public static let summary = "Shows the current track with transport controls."
+
+    public static let settings: [WidgetSetting] = [
+        WidgetSetting(
+            name: "placement", syntax: "leading | trailing | expanded", defaultValue: "expanded",
+            documentation: "Where the widget draws."),
+        WidgetSetting(
+            name: "artwork", syntax: "true | false", defaultValue: "true",
+            documentation: "Show album art."),
+        WidgetSetting(
+            name: "artwork-size", syntax: "points", defaultValue: "56",
+            documentation: "Size of the album art."),
+    ]
+
     public let placement: Placement
 
     private let showsArtwork: Bool

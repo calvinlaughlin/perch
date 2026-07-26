@@ -12,12 +12,29 @@ public final class WidgetRegistry {
     public static let shared = WidgetRegistry()
 
     private var factories: [String: (WidgetSettings) throws -> any NotchWidget] = [:]
+    private var descriptions: [String: (summary: String, settings: [WidgetSetting])] = [:]
 
     public init() {}
+
+    /// Register every widget perch ships with.
+    ///
+    /// Called before command-line handling as well as at launch: `--edit-config` generates a
+    /// starter config listing the available widgets, and it runs before the app does. Registering
+    /// only in `applicationDidFinishLaunching` left that list silently empty.
+    public static func registerBuiltIns() {
+        shared.register(MediaWidget.self)
+        shared.register(ClockWidget.self)
+    }
 
     /// Register a widget type under its `kind`.
     public func register<W: NotchWidget>(_ type: W.Type) {
         factories[type.kind] = { try type.init(settings: $0) }
+        descriptions[type.kind] = (type.summary, type.settings)
+    }
+
+    /// What a widget is and what it accepts, for the generated starter config.
+    public func describe(_ kind: String) -> (summary: String, settings: [WidgetSetting])? {
+        descriptions[kind]
     }
 
     /// Every registered kind, sorted, for diagnostics and help.

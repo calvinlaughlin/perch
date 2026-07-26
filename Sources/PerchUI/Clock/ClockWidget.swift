@@ -14,6 +14,20 @@ public final class ClockWidget: NotchWidget {
 
     public static let kind = "clock"
 
+    public static let summary = "Shows the time."
+
+    public static let settings: [WidgetSetting] = [
+        WidgetSetting(
+            name: "placement", syntax: "leading | trailing | expanded", defaultValue: "trailing",
+            documentation: "Where the widget draws. The strips need collapsed-bleed to have room."),
+        WidgetSetting(
+            name: "seconds", syntax: "true | false", defaultValue: "false",
+            documentation: "Include seconds."),
+        WidgetSetting(
+            name: "24-hour", syntax: "true | false", defaultValue: "false",
+            documentation: "Use a 24-hour clock."),
+    ]
+
     public let placement: Placement
 
     private let showsSeconds: Bool

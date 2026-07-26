@@ -31,22 +31,18 @@ public enum ConfigPaths {
     ///
     /// Opening an empty file teaches nothing. Seeding it with the generated defaults means the
     /// first thing anyone sees is every option, documented, already in the syntax they need.
+    /// - Parameter contents: what to seed a missing file with. Supplied by the caller because a
+    ///   useful starter config lists the registered widgets, and `PerchCore` does not know widgets
+    ///   exist.
+    /// - Returns: the config file's location, whether it already existed or was just created.
     @discardableResult
-    public static func ensureConfigFileExists() -> URL {
+    public static func ensureConfigFileExists(contents: @autoclosure () -> String) -> URL {
         let file = configFile
         guard !FileManager.default.fileExists(atPath: file.path) else { return file }
 
         try? FileManager.default.createDirectory(
             at: configDirectory, withIntermediateDirectories: true)
-        let seed = """
-            # perch configuration
-            #
-            # Every setting is optional — these are the defaults. Saving applies them immediately.
-            # Run `perch --show-config --docs` for the same list with documentation.
-
-            \(ConfigSchema.show())
-            """
-        try? seed.write(to: file, atomically: true, encoding: .utf8)
+        try? contents().write(to: file, atomically: true, encoding: .utf8)
         return file
     }
 

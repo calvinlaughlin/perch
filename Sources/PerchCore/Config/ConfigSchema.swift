@@ -7,6 +7,9 @@ public struct ConfigKey: Sendable {
     /// The key as written in the file.
     public let name: String
 
+    /// Which heading this key appears under in a generated config file.
+    public let section: String
+
     /// What values are accepted, shown in help — `hover | click | never`, `points`, `duration`.
     public let syntax: String
 
@@ -17,7 +20,7 @@ public struct ConfigKey: Sendable {
     let apply: @Sendable (inout Config, String) throws -> Void
 
     /// Render this key's current value the way the file would spell it.
-    let describe: @Sendable (Config) -> String
+    public let describe: @Sendable (Config) -> String
 }
 
 /// The complete set of keys perch understands.
@@ -34,6 +37,7 @@ public enum ConfigSchema {
     public static let keys: [ConfigKey] = [
         ConfigKey(
             name: "open-on",
+            section: "Interaction",
             syntax: OpenTrigger.allCases.map(\.rawValue).joined(separator: " | "),
             documentation: """
                 What opens the notch. `never` leaves it inert to the pointer; widgets can still peek.
@@ -43,6 +47,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "open-delay",
+            section: "Interaction",
             syntax: "duration",
             documentation: """
                 How long the pointer must rest on the notch before it opens. Stops the notch flying \
@@ -54,6 +59,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "display",
+            section: "Display",
             syntax: "notched | main | <display name>",
             documentation: """
                 Which display perch lives on. `notched` prefers one with a camera housing, `main` \
@@ -65,6 +71,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "expanded-height",
+            section: "Shape",
             syntax: "points",
             documentation: "Height of the expanded panel below the notch.",
             apply: { $0.expandedHeight = try ConfigValue.length($1) },
@@ -72,6 +79,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "expanded-width",
+            section: "Shape",
             syntax: "points",
             documentation: "Width of the expanded panel. Clamped to the display width.",
             apply: { $0.expandedWidth = try ConfigValue.length($1) },
@@ -79,6 +87,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "peek-height",
+            section: "Announcements",
             syntax: "points",
             documentation: """
                 Height of the panel shown when a widget announces something. Smaller than \
@@ -89,6 +98,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "peek-duration",
+            section: "Announcements",
             syntax: "duration",
             documentation: "How long an announcement stays up before reverting on its own.",
             apply: { $0.peekDuration = try ConfigValue.duration($1) },
@@ -96,6 +106,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "peek-on-track-change",
+            section: "Announcements",
             syntax: "true | false",
             documentation: "Whether changing track makes the notch announce the new one.",
             apply: { $0.peekOnTrackChange = try ConfigValue.bool($1) },
@@ -103,6 +114,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "corner-radius",
+            section: "Shape",
             syntax: "points",
             documentation: "Corner radius of the expanded panel's bottom corners.",
             apply: { $0.cornerRadius = try ConfigValue.length($1) },
@@ -110,6 +122,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "collapsed-corner-radius",
+            section: "Shape",
             syntax: "points",
             documentation: """
                 Corner radius of the collapsed shape's bottom corners. Defaults to roughly the \
@@ -120,6 +133,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "collapsed-bleed",
+            section: "Shape",
             syntax: "points",
             documentation: """
                 Extra width added to each side of the collapsed shape, letting widgets spill into \
@@ -130,6 +144,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "shoulder-radius",
+            section: "Shape",
             syntax: "points",
             documentation: """
                 Radius of the concave shoulders where an open panel meets the top of the display. \
@@ -140,6 +155,7 @@ public enum ConfigSchema {
         ),
         ConfigKey(
             name: "debug-shape",
+            section: "Debugging",
             syntax: "true | false",
             documentation: """
                 Draw the notch tinted and outlined instead of black, so its geometry is visible \

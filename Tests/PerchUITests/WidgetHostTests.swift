@@ -8,6 +8,12 @@ import Testing
 @MainActor
 private final class SpyWidget: NotchWidget {
     static let kind = "spy"
+    static let summary = "A test widget."
+    static let settings: [WidgetSetting] = [
+        WidgetSetting(
+            name: "placement", syntax: "leading | trailing | expanded", defaultValue: "expanded",
+            documentation: "Where the widget draws.")
+    ]
 
     /// How many times work was started and stopped, so leaks and double-starts are both visible.
     private(set) var activations = 0
@@ -200,5 +206,65 @@ struct WidgetLifecycleTests {
 
         #expect(host.widgets(at: .trailing).count == 1)
         #expect(host.widgets(at: .expanded).isEmpty)
+    }
+}
+
+@Suite("Generated starter config")
+@MainActor
+struct ConfigTemplateTests {
+
+    private func registry() -> WidgetRegistry {
+        let registry = WidgetRegistry()
+        registry.register(SpyWidget.self)
+        return registry
+    }
+
+    @Test("The generated config parses without complaint")
+    func generatedConfigIsValid() {
+        // It is the first thing a new user sees. A starter config that produced warnings would be
+        // a poor introduction to a tool whose whole premise is an editable text file.
+        let result = ConfigLoader.load(source: ConfigTemplate.starter(registry: registry()))
+
+        #expect(result.diagnostics.isEmpty, "\(result.diagnostics.map(\.description))")
+    }
+
+    @Test("The generated config changes nothing")
+    func generatedConfigMatchesDefaults() {
+        // Everything is commented out on purpose: a file pinning today's values would freeze them,
+        // so a later perch that improves a default would never reach anyone who opened their
+        // config once. Only the widget list is live.
+        let result = ConfigLoader.load(source: ConfigTemplate.starter(registry: registry()))
+
+        var expected = Config()
+        expected.widgets = Config().widgets  // the one thing the template writes uncommented
+        #expect(result.config == expected)
+    }
+
+    @Test("Every core key appears, so nothing is undiscoverable")
+    func everyKeyIsListed() {
+        let text = ConfigTemplate.starter(registry: registry())
+
+        for key in ConfigSchema.keys {
+            #expect(text.contains("#\(key.name) = "), "\(key.name) missing from the starter config")
+        }
+    }
+
+    @Test("Registered widgets and their settings are listed")
+    func widgetsAreDocumented() {
+        let text = ConfigTemplate.starter(registry: registry())
+
+        #expect(text.contains("spy —"))
+        for setting in SpyWidget.settings {
+            #expect(text.contains("spy-\(setting.name)"), "spy-\(setting.name) missing")
+        }
+    }
+
+    @Test("A widget that is not on by default is commented out")
+    func inactiveWidgetsAreCommented() {
+        let text = ConfigTemplate.starter(registry: registry())
+
+        // `spy` is not in Config().widgets, so enabling it must require an edit.
+        #expect(text.contains("#widget = spy"))
+        #expect(!text.contains("\nwidget = spy"))
     }
 }

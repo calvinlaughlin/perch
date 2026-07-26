@@ -13,6 +13,32 @@ public enum Placement: String, Equatable, Sendable, CaseIterable {
     case expanded
 }
 
+/// One documented setting a widget accepts.
+///
+/// Lets a widget describe its own options so the starter config can list them. Without this the
+/// only way to discover `media-artwork` would be to read the source, which rather defeats a
+/// config file whose whole premise is that it explains itself.
+public struct WidgetSetting: Equatable, Sendable {
+    /// The name after the widget's prefix: `artwork` in `media-artwork`.
+    public let name: String
+
+    /// What values are accepted, e.g. `true | false`.
+    public let syntax: String
+
+    /// The value used when the setting is absent.
+    public let defaultValue: String
+
+    /// One line explaining what it does.
+    public let documentation: String
+
+    public init(name: String, syntax: String, defaultValue: String, documentation: String) {
+        self.name = name
+        self.syntax = syntax
+        self.defaultValue = defaultValue
+        self.documentation = documentation
+    }
+}
+
 /// One widget's settings, as written in the config file.
 ///
 /// Values arrive as strings and are parsed by the widget itself. That keeps `PerchCore` from

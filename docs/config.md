@@ -6,7 +6,13 @@ perch reads one plain-text file:
 $XDG_CONFIG_HOME/perch/config      # or ~/.config/perch/config
 ```
 
-`perch --config-path` prints the exact location.
+`perch --config-path` prints the exact location. On first run perch writes an annotated starter
+config there listing every setting, every available widget, and what each accepts — so the file
+itself is the reference.
+
+**Everything in it is commented out.** A file pinning today's values would freeze them: a later
+perch that improved a default would never reach anyone who had opened their config once.
+Uncommenting a line is how you say you disagree with a default.
 
 **The file is optional.** The defaults are what perch is meant to look like; the file is for
 disagreeing with one of them, not a prerequisite for a working app. Changes apply the moment you

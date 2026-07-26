@@ -67,6 +67,12 @@ public protocol NotchWidget: AnyObject {
     /// seconds it gets — a peek is glanced at, not read.
     var peekBody: AnyView { get }
 
+    /// A one-line description, for the generated starter config.
+    static var summary: String { get }
+
+    /// The settings this widget accepts, documented for the generated starter config.
+    static var settings: [WidgetSetting] { get }
+
     /// Whether this widget keeps working while it cannot be seen.
     ///
     /// `false` by default, and that default is the point: a hidden widget doing nothing is what
@@ -88,6 +94,8 @@ extension NotchWidget {
     public func attach(attention: any NotchAttention) {}
     public var runsWhileHidden: Bool { false }
     public var peekBody: AnyView { body }
+    public static var summary: String { "" }
+    public static var settings: [WidgetSetting] { [] }
 }
 
 extension NotchWidget {

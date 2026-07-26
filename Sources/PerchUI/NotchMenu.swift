@@ -29,7 +29,7 @@ public enum NotchMenu {
 
         menu.addItem(
             ActionItem(title: "Reveal Configuration in Finder") {
-                let file = ConfigPaths.ensureConfigFileExists()
+                let file = ConfigPaths.ensureConfigFileExists(contents: ConfigTemplate.starter())
                 NSWorkspace.shared.activateFileViewerSelecting([file])
             })
 
@@ -73,7 +73,8 @@ public enum NotchMenu {
     /// Creates the file first: opening a path that does not exist either fails silently or dumps
     /// the user into an empty buffer with no clue what belongs in it.
     public static func openConfiguration() {
-        NSWorkspace.shared.open(ConfigPaths.ensureConfigFileExists())
+        NSWorkspace.shared.open(
+            ConfigPaths.ensureConfigFileExists(contents: ConfigTemplate.starter()))
     }
 }
 
