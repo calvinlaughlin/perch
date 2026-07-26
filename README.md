@@ -6,9 +6,8 @@ One plain-text config file, no settings UI, a small core, and a widget protocol 
 above that core is modular. Think less "a thousand options in a preferences window" and more
 "a file you edit and reload".
 
-> **Status: early.** Geometry, the window, the shape, interaction, the config system, and the
-> widget layer work and are verified on hardware. The media widget is next — so nothing is drawn
-> in the notch yet.
+> **Status: working.** Hover the notch and it shows what is playing, with artwork and transport
+> controls. Verified on hardware. Rough edges remain — see [Known gaps](#known-gaps).
 
 ## Configure it
 
@@ -122,3 +121,10 @@ MIT. See [LICENSE](LICENSE).
 perch bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD 3-Clause)
 to read now-playing information, which macOS 15.4 put behind an entitlement. See
 [NOTICES.md](NOTICES.md).
+
+## Known gaps
+
+- No single-instance guard: two copies of perch will fight over the notch.
+- Not notarized, so a downloaded build is Gatekeeper-blocked. Build from source for now.
+- The `peek` state exists in the state machine but nothing produces one yet.
+- Multi-display handling is written but only lightly exercised.

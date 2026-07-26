@@ -58,7 +58,9 @@ private func makeHost() -> (WidgetHost, WidgetRegistry) {
 
 @MainActor
 private func config(_ source: String) -> Config {
-    ConfigLoader.load(source: source).config
+    // Clear the default widget list first: these tests are about the registry, and the real
+    // default includes `media`, which the test registry deliberately does not know about.
+    ConfigLoader.load(source: "widget =\n" + source).config
 }
 
 @Suite("Widget registry")

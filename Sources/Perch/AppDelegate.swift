@@ -11,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var configWatcher: ConfigWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Every widget perch knows about. One line each; see docs/writing-a-widget.md.
+        WidgetRegistry.shared.register(MediaWidget.self)
+
         // Load before the panel exists, so the notch is never briefly drawn with the defaults and
         // then corrected — that flash is visible, and it happens on every launch.
         let initial = ConfigLoader.load(contentsOf: ConfigPaths.configFile)

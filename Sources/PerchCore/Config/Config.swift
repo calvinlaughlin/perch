@@ -33,7 +33,9 @@ public struct Config: Equatable, Sendable {
     // MARK: - Shape
 
     /// Height of the expanded panel below the notch, in points.
-    public var expandedHeight: CGFloat = 180
+    ///
+    /// Sized for one row of content. Raise it if a widget needs more room.
+    public var expandedHeight: CGFloat = 128
 
     /// Width of the expanded panel, in points.
     ///
@@ -69,7 +71,10 @@ public struct Config: Equatable, Sendable {
     /// Written as a repeated key — `widget = media` — because a list of things is the one shape a
     /// flat `key = value` grammar cannot express otherwise, and repeating a key is how every
     /// config format of this kind does it. `widget =` with no value clears the list.
-    public var widgets: [String] = []
+    ///
+    /// Defaults to the media widget: zero configuration has to be worth shipping, and a notch that
+    /// shows nothing at all is not.
+    public var widgets: [String] = ["media"]
 
     /// Per-widget settings, keyed by widget kind then setting name.
     ///

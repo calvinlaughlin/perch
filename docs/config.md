@@ -81,7 +81,7 @@ without moving the pointer off it.
 
 | Key | Accepts | Default |
 |---|---|---|
-| `expanded-height` | points | `180` |
+| `expanded-height` | points | `128` |
 | `expanded-width` | points | `420` |
 | `corner-radius` | points | `24` |
 | `collapsed-corner-radius` | points | `14` |
@@ -107,6 +107,57 @@ blend into and would just paint onto the menu bar beside the notch.
 The notch is physically black and so is the shape perch draws, which makes the collapsed state
 invisible by design and impossible to eyeball. `debug-shape = true` draws it tinted and outlined
 instead, so you can see exactly what geometry is being used.
+
+## Widgets
+
+Widgets are declared with a repeated key, and shown in the order declared:
+
+```ini
+widget = media
+```
+
+`widget =` with no value clears the list, which lets a pasted block start from nothing without
+knowing what came above it.
+
+Each widget's settings are prefixed with its name. A prefixed key whose widget has not been
+declared is reported, since it would otherwise silently do nothing:
+
+```
+~/.config/perch/config:8: warning: unknown key 'clock-format' — if this is a widget setting,
+declare the widget first with 'widget = clock'
+```
+
+Settings may appear above the `widget =` line that gives them meaning.
+
+**The media widget is enabled by default**, so perch shows what is playing with no config file at
+all.
+
+### media
+
+Shows the current track with transport controls, for any player the system knows about — Music,
+Spotify, browsers, anything that registers with macOS.
+
+| Key | Accepts | Default |
+|---|---|---|
+| `media-placement` | `leading` \| `trailing` \| `expanded` | `expanded` |
+| `media-artwork` | `true` \| `false` | `true` |
+| `media-artwork-size` | points | `56` |
+
+Album art is decoded off the main thread and downsampled to the size actually drawn, so a 3000px
+cover never becomes a 3000px bitmap.
+
+The widget only runs while it can be seen. With the default `expanded` placement, nothing is
+started until you open the notch, and everything is torn down when you close it — including the
+helper process that reads playback state.
+
+#### A note on how this works
+
+macOS 15.4 put `MediaRemote` behind an entitlement, so apps can no longer simply ask what is
+playing. perch reads it through a bundled helper loaded by `/usr/bin/perl`, whose bundle
+identifier is still entitled. That is a loophole and Apple may close it.
+
+If media stops appearing after a macOS update, that is the first thing to suspect. perch logs a
+diagnostic when the helper repeatedly fails rather than relaunching it forever.
 
 ## Displays without a notch
 

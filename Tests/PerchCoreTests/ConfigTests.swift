@@ -299,7 +299,7 @@ struct ConfigSchemaTests {
 struct WidgetConfigTests {
     @Test("Repeating the widget key builds a list in declaration order")
     func widgetsAreListed() {
-        let result = ConfigLoader.load(source: "widget = media\nwidget = clock")
+        let result = ConfigLoader.load(source: "widget =\nwidget = media\nwidget = clock")
 
         #expect(result.config.widgets == ["media", "clock"])
         #expect(result.diagnostics.isEmpty)
@@ -347,10 +347,24 @@ struct WidgetConfigTests {
 
     @Test("A prefixed key with no declared widget says what is missing")
     func undeclaredWidgetSettingIsExplained() {
-        let result = ConfigLoader.load(source: "media-artwork = true")
+        let result = ConfigLoader.load(source: "clock-format = 24h")
 
         let message = result.diagnostics.first?.message ?? ""
-        #expect(message.contains("widget = media"))
+        #expect(message.contains("widget = clock"))
+    }
+
+    @Test("The media widget is on by default")
+    func mediaIsOnByDefault() {
+        // Zero configuration has to be worth shipping, and a notch showing nothing is not.
+        #expect(Config().widgets == ["media"])
+        #expect(ConfigLoader.load(source: "").config.widgets == ["media"])
+    }
+
+    @Test("Declaring widgets replaces nothing implicitly")
+    func defaultSurvivesUnrelatedSettings() {
+        let result = ConfigLoader.load(source: "open-on = click")
+
+        #expect(result.config.widgets == ["media"])
     }
 
     @Test("The longest matching widget prefix wins")
