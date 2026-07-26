@@ -15,7 +15,10 @@ BUILD_DIR  := .build/$(CONFIG)
 APP        := build/$(NAME).app
 CONTENTS   := $(APP)/Contents
 
-.PHONY: all app build run test clean install uninstall
+# Everything swift-format and the compiler should look at.
+SWIFT_SOURCES := Sources Tests Package.swift
+
+.PHONY: all app build run test check fmt lint clean install uninstall
 
 all: app
 
@@ -47,6 +50,22 @@ run: app
 ## test — run the unit test suite.
 test:
 	swift test
+
+## check — the full gate: lint, build with warnings as errors, test.
+##
+## This is what CI runs and what to run before committing. Warnings are errors here on purpose:
+## a warning nobody fixes is just a lie about the state of the code.
+check: lint
+	swift build -c debug -Xswiftc -warnings-as-errors
+	swift test
+
+## fmt — reformat sources in place.
+fmt:
+	swift format --in-place --recursive $(SWIFT_SOURCES)
+
+## lint — check formatting and rules without modifying anything.
+lint:
+	swift format lint --strict --recursive --parallel $(SWIFT_SOURCES)
 
 ## install — copy the bundle into /Applications.
 install: app

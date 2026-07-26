@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A newer push to the same branch makes the in-flight run irrelevant.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, build, test
+    # perch is macOS-only and needs a recent SDK for the AppKit APIs it relies on.
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_26.app
+
+      - name: Report toolchain
+        run: |
+          swift --version
+          swift format --version
+
+      - name: Cache build products
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: ${{ runner.os }}-spm-
+
+      # Formatting and lint rules. Fails on any finding, so style never becomes a review topic.
+      - name: Lint
+        run: make lint
+
+      # Warnings are errors: an unfixed warning is a lie about the state of the code.
+      - name: Build
+        run: swift build -c debug -Xswiftc -warnings-as-errors
+
+      - name: Test
+        run: swift test
+
+      # Catches breakage in the bundle assembly itself — a release build and a working
+      # Info.plist are part of the deliverable, not an afterthought.
+      - name: Assemble app bundle
+        run: make app
+
+      - name: Verify bundle
+        run: |
+          plutil -lint build/perch.app/Contents/Info.plist
+          test -x build/perch.app/Contents/MacOS/perch

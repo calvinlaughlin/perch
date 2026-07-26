@@ -46,7 +46,9 @@ public final class NotchController {
         }
     }
 
-    /// Tear everything down. Safe to call more than once.
+    /// Tear everything down.
+    ///
+    /// Safe to call more than once.
     public func stop() {
         screenObservation?.cancel()
         screenObservation = nil
@@ -117,8 +119,10 @@ public final class NotchController {
         hostingView?.interactiveRect = model.activeRect
     }
 
-    /// Stand-in geometry for the window that would exist if no display were attached. Never drawn;
-    /// it only keeps `NotchModel` non-optional so views don't need to handle a nil layout.
+    /// Stand-in geometry for the window that would exist if no display were attached.
+    ///
+    /// Never drawn; it only keeps `NotchModel` non-optional so views don't need to handle a nil
+    /// layout.
     private static let placeholderScreen = ScreenGeometry(
         frame: CGRect(x: 0, y: 0, width: 1728, height: 1117),
         safeAreaTopInset: 0,

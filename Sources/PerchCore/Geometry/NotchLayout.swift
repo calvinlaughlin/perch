@@ -17,8 +17,10 @@ public struct NotchLayout: Equatable, Sendable {
 
     public var kind: Kind
 
-    /// The fixed window frame, in global screen coordinates. Sized to contain the fully expanded
-    /// shape with room to spare, and pinned flush to the top of the display.
+    /// The fixed window frame, in global screen coordinates.
+    ///
+    /// Sized to contain the fully expanded shape with room to spare, and pinned flush to the top
+    /// of the display.
     public var panelRect: CGRect
 
     /// The collapsed shape, in `panelRect`-local coordinates (origin top-left, y down — SwiftUI's
@@ -46,17 +48,23 @@ public struct NotchLayout: Equatable, Sendable {
     }
 }
 
-/// Tunables for how the notch shape is built. Populated from config; defaults chosen to look
-/// correct on a 14"/16" MacBook Pro with no configuration at all.
+/// Tunables for how the notch shape is built.
+///
+/// Populated from config; the defaults are chosen to look correct on a 14"/16" MacBook Pro with
+/// no configuration at all.
 public struct NotchGeometryOptions: Equatable, Sendable {
     /// Height of the expanded panel *below* the notch, in points.
     public var expandedHeight: CGFloat
 
-    /// Width of the expanded panel. Clamped to the display width at resolve time.
+    /// Width of the expanded panel.
+    ///
+    /// Clamped to the display width at resolve time.
     public var expandedWidth: CGFloat
 
-    /// Extra width added to each side of the collapsed shape, letting widgets spill into the dead
-    /// space beside the camera housing. Zero means "trace the hardware exactly".
+    /// Extra width added to each side of the collapsed shape.
+    ///
+    /// Lets widgets spill into the dead space beside the camera housing. Zero means "trace the
+    /// hardware exactly".
     public var collapsedSideBleed: CGFloat
 
     /// Size of the synthetic pill used on displays with no camera housing.

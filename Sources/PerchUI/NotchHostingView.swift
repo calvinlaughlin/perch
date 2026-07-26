@@ -9,8 +9,9 @@ import SwiftUI
 /// makes the transparent area behave like it isn't there.
 final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
-    /// The region that accepts mouse events, in SwiftUI's coordinate space (origin top-left,
-    /// y increasing downward). Everything outside it is click-through.
+    /// The region that accepts mouse events, in SwiftUI's coordinate space.
+    ///
+    /// Origin top-left, y increasing downward. Everything outside it is click-through.
     var interactiveRect: CGRect = .zero
 
     override func hitTest(_ point: NSPoint) -> NSView? {
@@ -19,7 +20,8 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
         // AppKit's y axis points up unless the view is flipped, but `interactiveRect` is always
         // expressed the way SwiftUI lays things out. Normalise before comparing.
-        let inLayoutSpace = isFlipped
+        let inLayoutSpace =
+            isFlipped
             ? local
             : NSPoint(x: local.x, y: bounds.height - local.y)
 

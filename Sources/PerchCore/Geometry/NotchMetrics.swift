@@ -25,7 +25,8 @@ public enum NotchMetrics {
 
         if screen.hasHardwareNotch {
             // The camera housing is exactly the gap the auxiliary areas leave between them.
-            let width = screen.frame.width
+            let width =
+                screen.frame.width
                 - screen.auxiliaryTopLeftWidth
                 - screen.auxiliaryTopRightWidth
             notchSize = CGSize(width: width, height: screen.safeAreaTopInset)

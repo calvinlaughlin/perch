@@ -7,9 +7,10 @@ import AppKit
 /// property below is load-bearing for one of those.
 public final class NotchPanel: NSPanel {
 
-    /// One step above `.mainMenu` (24), which is what puts us over the menu bar and the camera
-    /// housing. Deliberately not `CGShieldingWindowLevel()` — that sits above screen savers and
-    /// security prompts, which is antisocial for something that lives on screen permanently.
+    /// One step above `.mainMenu` (24), which puts us over the menu bar and the camera housing.
+    ///
+    /// Deliberately not `CGShieldingWindowLevel()` — that sits above screen savers and security
+    /// prompts, which is antisocial for something that lives on screen permanently.
     static let notchWindowLevel = NSWindow.Level.statusBar
 
     public init(contentRect: CGRect) {
@@ -54,8 +55,10 @@ public final class NotchPanel: NSPanel {
         animationBehavior = .none
     }
 
-    /// Never take key status. Widgets are click-to-act, and a text field in the notch would be
-    /// worth revisiting this for — but until then, focus should never leave the user's real work.
+    /// Never take key status.
+    ///
+    /// Widgets are click-to-act, and a text field in the notch would be worth revisiting this
+    /// for — but until then, focus should never leave the user's real work.
     public override var canBecomeKey: Bool { false }
 
     public override var canBecomeMain: Bool { false }

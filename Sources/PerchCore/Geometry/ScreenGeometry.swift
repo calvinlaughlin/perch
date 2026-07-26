@@ -18,15 +18,19 @@ public struct ScreenGeometry: Equatable, Sendable {
     /// displays without a camera housing — which is how we detect notchlessness.
     public var safeAreaTopInset: CGFloat
 
-    /// Width of the usable strip to the *left* of the camera housing, from `auxiliaryTopLeftArea`.
-    /// Zero on displays with no notch.
+    /// Width of the usable strip to the *left* of the camera housing.
+    ///
+    /// Taken from `auxiliaryTopLeftArea`. Zero on displays with no notch.
     public var auxiliaryTopLeftWidth: CGFloat
 
-    /// Width of the usable strip to the *right* of the camera housing, from `auxiliaryTopRightArea`.
-    /// Zero on displays with no notch.
+    /// Width of the usable strip to the *right* of the camera housing.
+    ///
+    /// Taken from `auxiliaryTopRightArea`. Zero on displays with no notch.
     public var auxiliaryTopRightWidth: CGFloat
 
-    /// Backing scale (2.0 on Retina). Used to snap geometry to whole pixels.
+    /// Backing scale of the display, 2.0 on Retina.
+    ///
+    /// Used to snap geometry to whole pixels.
     public var backingScaleFactor: CGFloat
 
     public init(

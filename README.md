@@ -25,6 +25,29 @@ make install  # copy to /Applications
 
 No `.xcodeproj` is committed. A clone builds with `make` and nothing else.
 
+## Development
+
+```sh
+make check    # lint + build with warnings-as-errors + test — run this before committing
+make fmt      # reformat in place
+make lint     # check formatting and rules, changing nothing
+```
+
+`make check` is exactly what CI runs, so a green local check means a green PR.
+
+Formatting and linting use **`swift format`**, which ships inside the Swift 6 toolchain — no
+Homebrew step, no pinned binary, nothing to drift. Config lives in [`.swift-format`](.swift-format).
+Beyond the defaults it turns on `NeverForceUnwrap`, `NeverUseForceTry`,
+`NeverUseImplicitlyUnwrappedOptionals`, `UseEarlyExits`, and the documentation-comment rules.
+
+`AllPublicDeclarationsHaveDocumentation` is deliberately **off**: it demands prose on memberwise
+initialisers and on SwiftUI's `body`, which is ceremony rather than explanation. Documenting the
+non-obvious is a convention here, not a rule — comments should say *why*, and the code should be
+clear enough to cover *what*.
+
+Warnings are errors in `check` and in CI. A warning nobody fixes is a lie about the state of
+the code.
+
 ## Design
 
 Four modules, dependencies pointing one direction:
