@@ -51,6 +51,28 @@ an afternoon.
    clipped eight points off one side. `NotchShape` therefore draws at absolute coordinates within
    the full panel — there is no frame left to round. Do not reintroduce one.
 
+## The Swift 6 concurrency trap
+
+**A closure written inside a `@MainActor` type is inferred `@MainActor`-isolated.** Hand one to an
+API that knows nothing about actors — `DispatchSource.setEventHandler`, C callbacks, older
+delegate APIs — and it runs on the wrong executor, Swift's isolation assertion fails, and the
+process dies with `SIGTRAP` in `_dispatch_assert_queue_fail`. It compiles clean with no warning.
+
+Mark such closures `@Sendable` explicitly, which opts them out of inheriting isolation, then hop
+to the main actor inside:
+
+```swift
+source.setEventHandler { @Sendable [weak self] in
+    Task { @MainActor in self?.doTheThing() }
+}
+```
+
+This cost an afternoon in `ConfigWatcher`. It presented as "live reload silently does not work",
+because the crash happened before the first line of the handler and took the whole app with it.
+When something concurrency-adjacent appears to do nothing, **check whether the process is still
+alive** before assuming the event never fired — `kill -0 $PID`. The crash report
+(`~/Library/Logs/DiagnosticReports/*.ips`) names the exact closure.
+
 ## Verifying notch geometry
 
 **Run `make probe` after touching geometry, the panel, or the shape.** It launches perch itself,

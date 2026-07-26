@@ -4,27 +4,33 @@ import PerchUI
 
 /// Wires the app together and owns the top-level objects.
 ///
-/// Kept deliberately thin: it decides *what* exists, not *how* anything works. Config loading and
-/// widget registration will hang off `applicationDidFinishLaunching` alongside the controller.
+/// Kept deliberately thin: it decides *what* exists, not *how* anything works.
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var notchController: NotchController?
+    private var configWatcher: ConfigWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        var config = Config()
+        // Load before the panel exists, so the notch is never briefly drawn with the defaults and
+        // then corrected — that flash is visible, and it happens on every launch.
+        let initial = ConfigLoader.load(contentsOf: ConfigPaths.configFile)
+        Self.report(initial)
 
-        // Temporary bootstrap. Until the config file parser lands this env var is the only way to
-        // reach `debug-shape`; it goes away once `debug-shape = true` in the config file works.
-        if ProcessInfo.processInfo.environment["PERCH_DEBUG_SHAPE"] == "1" {
-            config.debugShape = true
-        }
-
-        let controller = NotchController(config: config)
+        let controller = NotchController(config: initial.config)
         controller.start()
         notchController = controller
+
+        let watcher = ConfigWatcher { [weak controller] result in
+            Self.report(result)
+            controller?.apply(config: result.config)
+        }
+        watcher.start()
+        configWatcher = watcher
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        configWatcher?.stop()
+        configWatcher = nil
         notchController?.stop()
         notchController = nil
     }
@@ -32,5 +38,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// perch is ambient — closing whatever windows might exist should never quit it.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    /// Surface config problems without ever refusing to run.
+    private static func report(_ result: ConfigLoadResult) {
+        for diagnostic in result.diagnostics {
+            Log.config.error(diagnostic.description)
+        }
+        if result.diagnostics.isEmpty {
+            Log.config.info("loaded \(ConfigPaths.display(ConfigPaths.configFile))")
+        }
     }
 }

@@ -6,8 +6,24 @@ One plain-text config file, no settings UI, a small core, and a widget protocol 
 above that core is modular. Think less "a thousand options in a preferences window" and more
 "a file you edit and reload".
 
-> **Status: early.** The core — geometry, window, shape — works and is verified on hardware.
-> Config, widgets, and the media widget are in progress.
+> **Status: early.** Geometry, the window, the shape, interaction, and the config system work and
+> are verified on hardware. Widgets and the media widget are next.
+
+## Configure it
+
+```sh
+$EDITOR ~/.config/perch/config     # or `perch --config-path`
+```
+
+```ini
+open-on         = hover
+open-delay      = 120ms
+expanded-height = 180
+```
+
+Saved changes apply immediately. A typo warns and is skipped rather than taking the app down with
+it. `perch --show-config --docs` prints every key with documentation, and its output is itself a
+valid config file. See [docs/config.md](docs/config.md).
 
 ## Requirements
 
@@ -73,7 +89,11 @@ the transparent region behaves like it isn't there.
 `NotchMetrics` returns a synthetic pill hanging from the top edge. Nothing upstream special-cases it.
 
 **Idle cost is zero.** No polling timers. State is pushed, and widgets release everything they own
-when the notch is hidden.
+when the notch is hidden. The config file is watched with a kernel event source, not polled.
+
+**The config struct is the schema.** Each stored property on `Config` is a key, its declared value
+is the default, and its doc comment is the documentation — so `--show-config --docs` is generated
+from the same table the parser uses and cannot drift.
 
 ### Three AppKit landmines, documented so nobody rediscovers them
 

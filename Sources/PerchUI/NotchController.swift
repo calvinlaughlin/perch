@@ -66,6 +66,11 @@ public final class NotchController {
 
     /// Adopt a new config — the path a config-file reload takes.
     public func apply(config: Config) {
+        // A reload fires for every save, including saves that changed a comment or nothing at all,
+        // and `ConfigWatcher.start()` delivers the same config the app launched with. Rebuilding
+        // the panel for those is wasted work the user can sometimes see.
+        guard config != self.config else { return }
+
         self.config = config
         machine.openTrigger = config.openOn
         model.config = config
