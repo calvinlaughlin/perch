@@ -84,6 +84,14 @@ public final class NotchController {
         // `orderFrontRegardless` rather than `orderFront`: perch is an accessory app and is never
         // "active", so the ordinary ordering call would be a no-op.
         panel.orderFrontRegardless()
+
+        Log.geometry.info(
+            """
+            \(layout.kind == .hardware ? "hardware notch" : "synthetic pill") on \
+            \(screen.localizedName) — panel \(Self.describe(layout.panelRect)), \
+            collapsed \(Self.describe(layout.collapsedRect))
+            """
+        )
     }
 
     /// The panel, creating it on first use.
@@ -112,6 +120,11 @@ public final class NotchController {
         self.panel = panel
         self.hostingView = hostingView
         return panel
+    }
+
+    /// Format a rect compactly for logging.
+    private static func describe(_ rect: CGRect) -> String {
+        "\(Int(rect.minX)),\(Int(rect.minY)) \(Int(rect.width))×\(Int(rect.height))"
     }
 
     /// Keep the click-through region matched to the shape currently on screen.

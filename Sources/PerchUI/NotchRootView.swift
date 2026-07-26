@@ -22,8 +22,7 @@ public struct NotchRootView: View {
         )
         let overhang = shape.horizontalOverhang
 
-        shape
-            .fill(.black)
+        fill(shape)
             // Widen the frame so the shoulders have somewhere to render, then shift left by the
             // same amount so the notch body still lands exactly on the hardware.
             .frame(width: rect.width + overhang * 2, height: rect.height)
@@ -32,5 +31,17 @@ public struct NotchRootView: View {
             // which is the space `NotchLayout` expresses its rects in.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .ignoresSafeArea()
+    }
+
+    /// Black in normal use; tinted and outlined when inspecting geometry.
+    @ViewBuilder
+    private func fill(_ shape: NotchShape) -> some View {
+        if model.debugShape {
+            shape
+                .fill(.red.opacity(0.45))
+                .overlay(shape.stroke(.white, lineWidth: 1))
+        } else {
+            shape.fill(.black)
+        }
     }
 }

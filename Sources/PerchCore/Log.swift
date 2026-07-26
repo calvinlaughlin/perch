@@ -24,9 +24,13 @@ public struct Log: Sendable {
         logger.debug("\(message, privacy: .public)")
     }
 
-    /// Ordinary lifecycle events worth keeping in the system log.
+    /// Ordinary lifecycle events: which display was picked, config reloaded, widget started.
+    ///
+    /// Mirrored to stdout. The system log drops `info` unless something is actively streaming it,
+    /// and "run it in a terminal and watch what it does" is the main way perch gets debugged.
     public func info(_ message: String) {
         logger.info("\(message, privacy: .public)")
+        print("perch: \(label): \(message)")
     }
 
     /// A problem the user can act on.
