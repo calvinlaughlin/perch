@@ -11,6 +11,7 @@ import SwiftUI
 public final class NotchController {
 
     private let model: NotchModel
+    private let host: WidgetHost
     private var config: Config
     private var machine: NotchStateMachine
 
@@ -19,8 +20,9 @@ public final class NotchController {
     private var screenObservation: Task<Void, Never>?
     private var hoverSettleTask: Task<Void, Never>?
 
-    public init(config: Config = Config()) {
+    public init(config: Config = Config(), host: WidgetHost = WidgetHost()) {
         self.config = config
+        self.host = host
         self.machine = NotchStateMachine(openTrigger: config.openOn)
 
         // Resolve against the real display up front so the panel is never briefly misplaced.
@@ -34,8 +36,13 @@ public final class NotchController {
         )
     }
 
+    /// Diagnostics from the most recent widget build, for the caller to report.
+    public private(set) var widgetDiagnostics: [Diagnostic] = []
+
     /// Show the notch and begin tracking display changes.
     public func start() {
+        widgetDiagnostics = host.apply(config: config)
+        host.notchStateChanged(to: machine.state)
         rebuild()
 
         // Fires on resolution changes, display connect/disconnect, lid open/close, and menu bar
@@ -59,6 +66,7 @@ public final class NotchController {
         screenObservation = nil
         hoverSettleTask?.cancel()
         hoverSettleTask = nil
+        host.shutdown()
         panel?.orderOut(nil)
         panel = nil
         hostingView = nil
@@ -74,6 +82,8 @@ public final class NotchController {
         self.config = config
         machine.openTrigger = config.openOn
         model.config = config
+        widgetDiagnostics = host.apply(config: config)
+        host.notchStateChanged(to: machine.state)
         rebuild()
     }
 
@@ -116,6 +126,7 @@ public final class NotchController {
     private func deliver(_ event: NotchEvent) {
         guard machine.handle(event) else { return }
         model.state = machine.state
+        host.notchStateChanged(to: machine.state)
         syncInteractiveRect()
     }
 
@@ -126,9 +137,12 @@ public final class NotchController {
         guard let screen = NSScreen.preferredNotchScreen else {
             // Every display is gone (fully asleep, or a headless state). Hide rather than draw
             // into nothing, and wait for the next screen-parameters notification.
+            host.setOnScreen(false)
             panel?.orderOut(nil)
             return
         }
+
+        host.setOnScreen(true)
 
         let layout = NotchMetrics.resolve(
             for: ScreenGeometry(screen: screen),
@@ -158,7 +172,7 @@ public final class NotchController {
         if let panel { return panel }
 
         let panel = NotchPanel(contentRect: frame)
-        let hostingView = NotchHostingView(rootView: NotchRootView(model: model))
+        let hostingView = NotchHostingView(rootView: NotchRootView(model: model, host: host))
 
         // Opt out of safe-area insets entirely. On a notched display AppKit would otherwise inset
         // this view by the notch height — pushing our content *below* the exact region we exist to

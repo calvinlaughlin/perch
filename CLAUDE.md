@@ -116,6 +116,17 @@ screencapture -x -R740,0,250,50 /tmp/notch.png   # region is in points, capture 
 Then sample rows for the expected colour. Quit any other notch app first (NotchNook lives in
 `~/Downloads` on this machine) — two apps drawing the same region makes every check ambiguous.
 
+## Widgets
+
+A widget is one file conforming to `NotchWidget` plus one `WidgetRegistry.shared.register` line.
+Settings are parsed by the widget from `WidgetSettings`, so adding one never touches `Config`.
+
+The protocol is `NotchWidget`, not `Widget`: SwiftUI declares its own `Widget` for WidgetKit, and
+every widget file imports SwiftUI. Do not "fix" the name.
+
+`deactivate()` must release every timer, task, observer, and subprocess. The zero-idle-cost claim
+is the sum of every widget honouring that. `WidgetHost` guarantees calls are balanced.
+
 ## Conventions
 
 - Comments explain **why**, not what. The code covers what.

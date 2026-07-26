@@ -6,8 +6,9 @@ One plain-text config file, no settings UI, a small core, and a widget protocol 
 above that core is modular. Think less "a thousand options in a preferences window" and more
 "a file you edit and reload".
 
-> **Status: early.** Geometry, the window, the shape, interaction, and the config system work and
-> are verified on hardware. Widgets and the media widget are next.
+> **Status: early.** Geometry, the window, the shape, interaction, the config system, and the
+> widget layer work and are verified on hardware. The media widget is next — so nothing is drawn
+> in the notch yet.
 
 ## Configure it
 
@@ -90,6 +91,10 @@ the transparent region behaves like it isn't there.
 
 **Idle cost is zero.** No polling timers. State is pushed, and widgets release everything they own
 when the notch is hidden. The config file is watched with a kernel event source, not polled.
+
+**Widgets are the extension point.** A widget is one file: it declares a name, parses its own
+settings, says where it draws, and starts and stops its own work. Adding one needs no change to the
+config schema. See [docs/writing-a-widget.md](docs/writing-a-widget.md).
 
 **The config struct is the schema.** Each stored property on `Config` is a key, its declared value
 is the default, and its doc comment is the documentation — so `--show-config --docs` is generated

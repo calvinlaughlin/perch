@@ -294,3 +294,107 @@ struct ConfigSchemaTests {
         #expect(result.config == config)
     }
 }
+
+@Suite("Widget configuration")
+struct WidgetConfigTests {
+    @Test("Repeating the widget key builds a list in declaration order")
+    func widgetsAreListed() {
+        let result = ConfigLoader.load(source: "widget = media\nwidget = clock")
+
+        #expect(result.config.widgets == ["media", "clock"])
+        #expect(result.diagnostics.isEmpty)
+    }
+
+    @Test("Declaring the same widget twice does not duplicate it")
+    func widgetsAreDeduplicated() {
+        let result = ConfigLoader.load(source: "widget = media\nwidget = media")
+
+        #expect(result.config.widgets == ["media"])
+    }
+
+    @Test("An empty widget key clears the list")
+    func emptyWidgetKeyClearsTheList() {
+        // Lets a pasted block start from nothing without knowing what came above it.
+        let result = ConfigLoader.load(source: "widget = media\nwidget =\nwidget = clock")
+
+        #expect(result.config.widgets == ["clock"])
+    }
+
+    @Test("Prefixed keys route to their widget")
+    func settingsRouteToTheirWidget() {
+        let result = ConfigLoader.load(
+            source: """
+                widget = media
+                media-artwork = true
+                media-placement = expanded
+                """
+        )
+
+        let settings = result.config.settings(for: "media")
+        #expect(try! settings.bool("artwork", default: false))
+        #expect(settings.string("placement", default: "") == "expanded")
+        #expect(result.diagnostics.isEmpty)
+    }
+
+    @Test("Settings may appear above the widget that owns them")
+    func settingsMayPrecedeTheirDeclaration() {
+        // People group settings by topic, not by declaration order.
+        let result = ConfigLoader.load(source: "media-artwork = true\nwidget = media")
+
+        #expect(try! result.config.settings(for: "media").bool("artwork", default: false))
+        #expect(result.diagnostics.isEmpty)
+    }
+
+    @Test("A prefixed key with no declared widget says what is missing")
+    func undeclaredWidgetSettingIsExplained() {
+        let result = ConfigLoader.load(source: "media-artwork = true")
+
+        let message = result.diagnostics.first?.message ?? ""
+        #expect(message.contains("widget = media"))
+    }
+
+    @Test("The longest matching widget prefix wins")
+    func longestPrefixWins() {
+        let result = ConfigLoader.load(
+            source: """
+                widget = media
+                widget = media-remote
+                media-remote-timeout = 5s
+                """
+        )
+
+        #expect(result.config.settings(for: "media-remote").names == ["timeout"])
+        #expect(result.config.settings(for: "media").names.isEmpty)
+    }
+
+    @Test("A widget's settings survive a round trip through a bad value")
+    func badWidgetValueIsReportedByTheWidget() throws {
+        // Core stores settings as written; the widget parses them, so the error names the key as
+        // the user spelled it rather than the bare setting.
+        let result = ConfigLoader.load(source: "widget = media\nmedia-artwork = perhaps")
+        let settings = result.config.settings(for: "media")
+
+        let error = try #require(throws: ConfigValueError.self) {
+            try settings.bool("artwork", default: false)
+        }
+        #expect(error.message.contains("media-artwork"))
+    }
+
+    @Test("A widget with no settings still yields usable defaults")
+    func widgetsWorkWithNoSettings() throws {
+        let result = ConfigLoader.load(source: "widget = media")
+        let settings = result.config.settings(for: "media")
+
+        #expect(try settings.bool("artwork", default: true))
+        #expect(settings.string("placement", default: "expanded") == "expanded")
+    }
+
+    @Test("Core keys are not mistaken for widget settings")
+    func coreKeysStillWork() {
+        // `open-on` must not be read as widget `open`, setting `on`.
+        let result = ConfigLoader.load(source: "widget = open\nopen-on = click")
+
+        #expect(result.config.openOn == Config().openOn)  // routed to the widget, not the core key
+        #expect(result.config.settings(for: "open").names == ["on"])
+    }
+}

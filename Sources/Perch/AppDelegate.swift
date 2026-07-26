@@ -19,10 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = NotchController(config: initial.config)
         controller.start()
         notchController = controller
+        Self.report(controller.widgetDiagnostics)
 
         let watcher = ConfigWatcher { [weak controller] result in
             Self.report(result)
             controller?.apply(config: result.config)
+            Self.report(controller?.widgetDiagnostics ?? [])
         }
         watcher.start()
         configWatcher = watcher
@@ -47,6 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if result.diagnostics.isEmpty {
             Log.config.info("loaded \(ConfigPaths.display(ConfigPaths.configFile))")
+        }
+    }
+
+    /// Surface widget problems, which are found after parsing rather than during it.
+    private static func report(_ diagnostics: [Diagnostic]) {
+        for diagnostic in diagnostics {
+            Log.widget.error(diagnostic.description)
         }
     }
 }

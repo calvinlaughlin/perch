@@ -62,6 +62,27 @@ public struct Config: Equatable, Sendable {
     /// exactly.
     public var collapsedBleed: CGFloat = 0
 
+    // MARK: - Widgets
+
+    /// Which widgets to show, in declaration order.
+    ///
+    /// Written as a repeated key — `widget = media` — because a list of things is the one shape a
+    /// flat `key = value` grammar cannot express otherwise, and repeating a key is how every
+    /// config format of this kind does it. `widget =` with no value clears the list.
+    public var widgets: [String] = []
+
+    /// Per-widget settings, keyed by widget kind then setting name.
+    ///
+    /// Populated from prefixed keys: `media-artwork = true` becomes
+    /// `widgetSettings["media"]["artwork"] = "true"`. Values stay as written and are parsed by the
+    /// widget, so `PerchCore` never has to know what settings exist.
+    public var widgetSettings: [String: [String: String]] = [:]
+
+    /// The settings for one widget kind, empty if it has none.
+    public func settings(for kind: String) -> WidgetSettings {
+        WidgetSettings(kind: kind, values: widgetSettings[kind] ?? [:])
+    }
+
     // MARK: - Debugging
 
     /// Draw the notch shape tinted and outlined instead of black.

@@ -10,9 +10,11 @@ import SwiftUI
 public struct NotchRootView: View {
 
     private let model: NotchModel
+    private let host: WidgetHost
 
-    public init(model: NotchModel) {
+    public init(model: NotchModel, host: WidgetHost) {
         self.model = model
+        self.host = host
     }
 
     public var body: some View {
@@ -30,6 +32,7 @@ public struct NotchRootView: View {
         )
 
         fill(shape)
+            .overlay { NotchContentView(model: model, host: host) }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Slightly overdamped: the notch is a physical object on the bezel, and overshoot
             // reads as wobble rather than liveliness at this size.

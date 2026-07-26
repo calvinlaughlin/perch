@@ -12,5 +12,6 @@ let package = Package(
         .target(name: "PerchUI", dependencies: ["PerchCore"]),
         .executableTarget(name: "Perch", dependencies: ["PerchCore", "PerchUI"]),
         .testTarget(name: "PerchCoreTests", dependencies: ["PerchCore"]),
+        .testTarget(name: "PerchUITests", dependencies: ["PerchUI"]),
     ]
 )
