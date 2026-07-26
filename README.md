@@ -29,8 +29,13 @@ the new one on its own, then revert.</sub>
 
 ## Install
 
-Download the latest release, unzip, and drag `perch.app` to `/Applications`. It is signed and
-notarized, so it opens without a Gatekeeper warning.
+```sh
+brew install --cask calvinlaughlin/tap/perch
+```
+
+Or download the [latest release](https://github.com/calvinlaughlin/perch/releases/latest), unzip,
+and drag `perch.app` to `/Applications`. It is signed and notarized, so it opens without a
+Gatekeeper warning.
 
 Or build it:
 
