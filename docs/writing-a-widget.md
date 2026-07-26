@@ -8,14 +8,23 @@ import PerchCore
 import SwiftUI
 
 @MainActor
+@Observable
 final class ClockWidget: NotchWidget {
     static let kind = "clock"
+
+    // Shown in the starter config perch writes on first run.
+    static let summary = "Shows the time."
+    static let settings: [WidgetSetting] = [
+        WidgetSetting(
+            name: "seconds", syntax: "true | false", defaultValue: "false",
+            documentation: "Include seconds.")
+    ]
 
     let placement: Placement
     private let showsSeconds: Bool
     private var ticker: Task<Void, Never>?
 
-    private var now = Date()
+    fileprivate private(set) var now = Date()
 
     init(settings: WidgetSettings) throws {
         placement = try settings.enumeration("placement", default: .trailing)
@@ -23,9 +32,10 @@ final class ClockWidget: NotchWidget {
     }
 
     func activate() {
+        guard ticker == nil else { return }
         ticker = Task { [weak self] in
             while !Task.isCancelled {
-                await MainActor.run { self?.now = Date() }
+                self?.now = Date()
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -42,11 +52,14 @@ final class ClockWidget: NotchWidget {
 }
 ```
 
-Register it once, in `AppDelegate`:
+Register it in `WidgetRegistry.registerBuiltIns()`:
 
 ```swift
-WidgetRegistry.shared.register(ClockWidget.self)
+shared.register(ClockWidget.self)
 ```
+
+Registration lives there rather than in `AppDelegate` because `perch --edit-config` generates a
+starter config listing the available widgets, and it runs before the app starts.
 
 It is now reachable from config:
 
@@ -82,6 +95,10 @@ Throwing from `init` is fine and expected for a value that cannot be parsed. It 
 ordinary config diagnostic naming the key as the user spelled it, and the other widgets still
 load.
 
+`summary` and `settings` are optional but worth filling in: they are what makes the widget appear,
+documented, in the config perch writes on first run. Without them the only way to discover the
+widget is to read the source.
+
 ## Placement
 
 | Placement | Where | Visible |
@@ -108,6 +125,50 @@ sense when someone is looking never starts.
 
 The host guarantees these are balanced: no double `activate()`, and `deactivate()` only after a
 matching `activate()`.
+
+### Running while hidden
+
+A widget that needs to keep working when it cannot be seen opts in:
+
+```swift
+var runsWhileHidden: Bool { true }
+```
+
+`false` by default, and that default is the point. Opting in is a promise that idle cost is
+genuinely negligible — **measure it before making that promise.** The media widget opts in because
+a track change cannot be announced by something that is not watching; its helper measures 0% CPU
+and about 18MB.
+
+## Announcing something
+
+A widget can ask the notch to peek — briefly enlarge to show something, then revert. Take the
+handle when it is offered:
+
+```swift
+private var attention: (any NotchAttention)?
+
+func attach(attention: any NotchAttention) {
+    self.attention = attention
+}
+```
+
+and ask when something worth announcing happens:
+
+```swift
+attention?.requestPeek()
+```
+
+Whether the request is honoured is not the widget's decision: a peek never interrupts a panel the
+user opened themselves, and it reverts on its own after `peek-duration`.
+
+Peeks are for genuine changes, not for updates. The media widget peeks on a change of *track*, not
+on every playback update — announcing each one would be intolerable.
+
+Override `peekBody` to show something more compact during a peek; it defaults to `body`.
+
+```swift
+var peekBody: AnyView { AnyView(Text(title).font(.system(size: 12))) }
+```
 
 ## Testing
 

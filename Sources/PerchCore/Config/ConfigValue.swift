@@ -71,10 +71,14 @@ public enum ConfigValue {
     }
 
     /// Render a duration the way the config file would spell it.
+    ///
+    /// Whole seconds are written as seconds. `2s` is what someone would type and what the
+    /// documentation says; `2000ms` is the same value spelled in a way nobody chooses.
     public static func describe(_ duration: Duration) -> String {
         let ms =
             duration.components.seconds * 1000
             + duration.components.attoseconds / 1_000_000_000_000_000
+        if ms >= 1000, ms % 1000 == 0 { return "\(ms / 1000)s" }
         return "\(ms)ms"
     }
 

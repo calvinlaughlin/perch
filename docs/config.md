@@ -112,7 +112,7 @@ connected falls back to `notched` rather than leaving perch invisible.
 
 | Key | Accepts | Default |
 |---|---|---|
-| `expanded-height` | points | `128` |
+| `expanded-height` | points | `88` |
 | `expanded-width` | points | `420` |
 | `corner-radius` | points | `24` |
 | `collapsed-corner-radius` | points | `14` |
@@ -177,9 +177,10 @@ Spotify, browsers, anything that registers with macOS.
 Album art is decoded off the main thread and downsampled to the size actually drawn, so a 3000px
 cover never becomes a 3000px bitmap.
 
-The widget only runs while it can be seen. With the default `expanded` placement, nothing is
-started until you open the notch, and everything is torn down when you close it — including the
-helper process that reads playback state.
+Unlike most widgets, media keeps working while the notch is closed. It has to: a track change
+cannot be announced by something that is not watching, and opening the notch should show the
+current track rather than an empty panel. The helper it runs idles at 0% CPU and about 18MB, and
+is released if the notch stays shut for 90 seconds.
 
 #### A note on how this works
 
