@@ -13,7 +13,9 @@ concurrency:
 
 jobs:
   check:
-    name: Lint, build, test
+    # Named for the target it runs, not for the steps inside it, so the required status check does
+    # not need renaming every time `make check` learns to do something else.
+    name: Check
     # perch is macOS-only and needs a recent SDK for the AppKit APIs it relies on.
     runs-on: macos-15
 
@@ -50,16 +52,15 @@ jobs:
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift', 'Package.resolved') }}
           restore-keys: ${{ runner.os }}-spm-
 
-      # Formatting and lint rules. Fails on any finding, so style never becomes a review topic.
-      - name: Lint
-        run: make lint
-
-      # Warnings are errors: an unfixed warning is a lie about the state of the code.
-      - name: Build
-        run: swift build -c debug -Xswiftc -warnings-as-errors
-
-      - name: Test
-        run: swift test
+      # Invoke `make check` rather than restating what it does. Listing the steps separately here
+      # is how the architecture guard went missing: `check` grew an `arch` prerequisite and this
+      # file, which had copied out its steps, silently kept running the old set. An `import AppKit`
+      # in PerchCore passed CI for as long as that drift lasted.
+      #
+      # Lint, the PerchCore architecture guard, a warnings-as-errors build, and the tests — one
+      # target, so "make check is what CI runs" is true by construction rather than by upkeep.
+      - name: Check
+        run: make check
 
       # Catches breakage in the bundle assembly itself — a release build and a working
       # Info.plist are part of the deliverable, not an afterthought.
