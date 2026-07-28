@@ -41,6 +41,21 @@ public struct Config: Equatable, Sendable {
     /// perch invisible.
     public var display: String = "notched"
 
+    /// Which events make the trackpad tap: `never`, `open`, `peek`, or `all`.
+    ///
+    /// Off by default, and deliberately so. The notch opens on hover, which means every trip to
+    /// the menu bar passes over it — a tap on each of those would be a thing you feel all day
+    /// without having asked for it. Haptics are also hardware the user may not have: nothing
+    /// happens on a Mac without a Force Touch trackpad, or with system haptics switched off, so a
+    /// default of `all` would be inert for some people and intrusive for the rest. Opting in is
+    /// the only setting that is right for everyone.
+    public var haptics: HapticTrigger = .never
+
+    /// How a tap feels.
+    ///
+    /// `alignment` is the lightest of the three, and the notch opening is a small event.
+    public var hapticPattern: HapticPattern = .alignment
+
     // MARK: - Shape
 
     /// Height of the expanded panel below the notch, in points.
@@ -120,6 +135,11 @@ public struct Config: Equatable, Sendable {
     public var debugShape: Bool = false
 
     public init() {}
+
+    /// The subset of config that the haptic engine needs.
+    public var hapticPolicy: HapticPolicy {
+        HapticPolicy(trigger: haptics, pattern: hapticPattern)
+    }
 
     /// The subset of config that `NotchMetrics` needs.
     ///

@@ -58,6 +58,30 @@ public enum ConfigSchema {
             describe: { ConfigValue.describe($0.openDelay) }
         ),
         ConfigKey(
+            name: "haptics",
+            section: "Interaction",
+            syntax: HapticTrigger.allCases.map(\.rawValue).joined(separator: " | "),
+            documentation: """
+                Which events tap the trackpad. `open` taps when the notch opens, `peek` when a \
+                widget announces something, `all` for both. Needs a Force Touch trackpad and \
+                system haptics left on; does nothing otherwise.
+                """,
+            apply: { $0.haptics = try ConfigValue.enumeration($1) },
+            describe: { $0.haptics.rawValue }
+        ),
+        ConfigKey(
+            name: "haptic-pattern",
+            section: "Interaction",
+            syntax: HapticPattern.allCases.map(\.rawValue).joined(separator: " | "),
+            documentation: """
+                How a tap feels. `alignment` is the light tap of something snapping to a guide, \
+                `generic` a single firmer one, `level-change` the two-part tap of a detent. \
+                Ignored unless `haptics` is on.
+                """,
+            apply: { $0.hapticPattern = try ConfigValue.enumeration($1) },
+            describe: { $0.hapticPattern.rawValue }
+        ),
+        ConfigKey(
             name: "display",
             section: "Display",
             syntax: "notched | main | <display name>",
