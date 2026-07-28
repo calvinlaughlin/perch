@@ -12,6 +12,7 @@ public final class NotchController: NotchAttention {
 
     private let model: NotchModel
     private let host: WidgetHost
+    private let haptics: HapticEngine
     private var config: Config
     private var machine: NotchStateMachine
 
@@ -21,9 +22,14 @@ public final class NotchController: NotchAttention {
     private var hoverSettleTask: Task<Void, Never>?
     private var peekExpiryTask: Task<Void, Never>?
 
-    public init(config: Config = Config(), host: WidgetHost = WidgetHost()) {
+    public init(
+        config: Config = Config(),
+        host: WidgetHost = WidgetHost(),
+        haptics: HapticEngine = .system
+    ) {
         self.config = config
         self.host = host
+        self.haptics = haptics
         self.machine = NotchStateMachine(openTrigger: config.openOn)
 
         // Resolve against the real display up front so the panel is never briefly misplaced.
@@ -149,8 +155,15 @@ public final class NotchController: NotchAttention {
 
     /// Push an event through the state machine and reflect any change in the view.
     private func deliver(_ event: NotchEvent) {
+        let previous = machine.state
         guard machine.handle(event) else { return }
         model.state = machine.state
+
+        // Only on a real transition, which is what `handle` returning true means. Hover sends
+        // `pointerEntered` and `hoverSettled` for one opening, and a notch already open keeps
+        // receiving events — tapping for each would turn one gesture into a stutter.
+        haptics.perform(config.hapticPolicy, from: previous, to: machine.state)
+
         host.notchStateChanged(to: machine.state)
         syncInteractiveRect()
     }

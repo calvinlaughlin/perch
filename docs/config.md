@@ -73,6 +73,8 @@ so it cannot drift out of date with what perch actually does.
 |---|---|---|
 | `open-on` | `hover` \| `click` \| `never` | `hover` |
 | `open-delay` | duration | `120ms` |
+| `haptics` | `never` \| `open` \| `peek` \| `all` | `never` |
+| `haptic-pattern` | `generic` \| `alignment` \| `level-change` | `alignment` |
 
 `open-on = never` leaves the notch inert to the pointer; widgets can still peek.
 
@@ -82,6 +84,36 @@ open every time you cross the top of the screen on the way to the menu bar. Igno
 
 Clicking toggles the panel even when `open-on` is `hover`, so there is always a way to dismiss it
 without moving the pointer off it.
+
+#### Haptics
+
+`haptics` taps the trackpad when the notch changes state. Two things can tap, and the four values
+cover every combination: `open` when the notch opens, `peek` when a widget announces something,
+`all` for both, `never` for neither.
+
+```ini
+haptics        = all
+haptic-pattern = level-change
+```
+
+Only transitions *into* an open or announcing state tap. Collapsing does not — by the time the
+notch closes the pointer has already left it, and a tap chasing you away tells you nothing you did
+not just do on purpose.
+
+`haptic-pattern` picks how the tap feels, from the three patterns macOS ships: `alignment` is the
+light tap of something snapping to a guide, `generic` a single firmer one, and `level-change` the
+two-part tap of a detent moving between stops. These name system patterns rather than an intensity
+because macOS tunes each one to the hardware and to the trackpad settings, which a hand-rolled
+intensity would fight.
+
+**It is off by default,** which is a deliberate choice rather than an oversight. The notch opens on
+hover, so every trip to the menu bar passes over it — a tap on each of those is something you feel
+all day without having asked for it. Turning it on is a small, specific "yes I want this".
+
+**It needs the hardware.** Haptic feedback does nothing on a Mac without a Force Touch trackpad —
+an external mouse, an older machine, a Mac mini — and nothing when *Force Click and haptic
+feedback* is switched off in System Settings. perch does not work around either: a machine that
+cannot tap simply does not, and a user who turned haptics off system-wide meant it.
 
 ### Announcements
 
