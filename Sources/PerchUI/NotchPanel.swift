@@ -55,11 +55,15 @@ public final class NotchPanel: NSPanel {
         animationBehavior = .none
     }
 
-    /// Never take key status.
+    /// Whether the panel is willing to become key right now.
     ///
-    /// Widgets are click-to-act, and a text field in the notch would be worth revisiting this
-    /// for — but until then, focus should never leave the user's real work.
-    public override var canBecomeKey: Bool { false }
+    /// Off by default so the notch is inert to focus while it is closed or merely peeking —
+    /// clicking it will not deactivate the frontmost app, and the user's text cursor stays where
+    /// it was. Turned on only for the moments a widget genuinely needs typing (the notes editor,
+    /// while the panel is open), by `NotchController` toggling `focusable` around a state change.
+    var focusable: Bool = false
+
+    public override var canBecomeKey: Bool { focusable }
 
     public override var canBecomeMain: Bool { false }
 

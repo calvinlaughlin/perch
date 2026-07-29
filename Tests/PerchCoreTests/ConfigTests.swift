@@ -353,18 +353,18 @@ struct WidgetConfigTests {
         #expect(message.contains("widget = clock"))
     }
 
-    @Test("The media widget is on by default")
-    func mediaIsOnByDefault() {
+    @Test("Media and notes are on by default")
+    func defaultsAreShipped() {
         // Zero configuration has to be worth shipping, and a notch showing nothing is not.
-        #expect(Config().widgets == ["media"])
-        #expect(ConfigLoader.load(source: "").config.widgets == ["media"])
+        #expect(Config().widgets == ["media", "notes"])
+        #expect(ConfigLoader.load(source: "").config.widgets == ["media", "notes"])
     }
 
     @Test("Declaring widgets replaces nothing implicitly")
     func defaultSurvivesUnrelatedSettings() {
         let result = ConfigLoader.load(source: "open-on = click")
 
-        #expect(result.config.widgets == ["media"])
+        #expect(result.config.widgets == ["media", "notes"])
     }
 
     @Test("The longest matching widget prefix wins")

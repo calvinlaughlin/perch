@@ -40,25 +40,27 @@ struct NotchContentView: View {
     // MARK: - Expanded
 
     /// Widgets in the body of the open panel, below the camera housing.
+    ///
+    /// One widget is shown at a time; scrolling vertically inside the panel moves between them and
+    /// the choice is remembered on `model.expandedPageIndex` so a close-and-reopen returns to the
+    /// same one. That is the deliberate compromise for a panel this small: two widgets crammed
+    /// side-by-side each get less than half the width, but one at a time gets the full row.
     private var expandedContent: some View {
         let rect = model.layout.expandedRect
         let housingHeight = model.layout.hardwareRect.height
         let inset: CGFloat = 10
+        let widgets = host.widgets(at: .expanded)
 
-        return HStack(spacing: inset) {
-            ForEach(Array(host.widgets(at: .expanded).enumerated()), id: \.offset) { _, widget in
-                widget.body
-            }
-        }
-        .frame(
-            width: max(0, rect.width - inset * 2),
-            // Start below the housing: content drawn behind it is content nobody can see.
-            height: max(0, rect.height - housingHeight - inset)
-        )
-        .position(
-            x: rect.midX,
-            y: housingHeight + (rect.height - housingHeight) / 2
-        )
+        return ExpandedPager(model: model, widgets: widgets)
+            .frame(
+                width: max(0, rect.width - inset * 2),
+                // Start below the housing: content drawn behind it is content nobody can see.
+                height: max(0, rect.height - housingHeight - inset)
+            )
+            .position(
+                x: rect.midX,
+                y: housingHeight + (rect.height - housingHeight) / 2
+            )
     }
 
     /// Widgets in a peek: compact, centred, no controls.
@@ -123,4 +125,67 @@ struct NotchContentView: View {
         .frame(maxWidth: .infinity, alignment: alignment)
         .padding(.horizontal, 6)
     }
+}
+
+// MARK: - Expanded pager
+
+/// Shows one expanded widget at a time and switches between them on a vertical scroll.
+///
+/// The panel itself never resizes (see `NotchShape` comments), so a scrolling *pager* rather than
+/// a scrolling *stack*: pages are the same size as the container, only one is on screen, and the
+/// transition slides one out as the other slides in. That way the panel always looks full and the
+/// user still gets to move between widgets without either being cropped.
+private struct ExpandedPager: View {
+
+    @Bindable var model: NotchModel
+    let widgets: [any NotchWidget]
+
+    var body: some View {
+        // Read the currently-selected page and clamp: a config reload can remove a widget, and an
+        // out-of-range index left over from the previous set must not crash the view.
+        let count = max(widgets.count, 1)
+        let index = min(max(model.expandedPageIndex, 0), max(widgets.count - 1, 0))
+
+        return ZStack(alignment: .trailing) {
+            if widgets.isEmpty {
+                Color.clear
+            } else {
+                // A transition rather than a real scroll view: SwiftUI's ScrollView would try to
+                // manage its own offset and paging feel, and a panel this small needs a single
+                // sharp snap between widgets, not free scrolling.
+                widgets[index].body
+                    .id(index)
+                    .transition(
+                        .asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .move(edge: .top).combined(with: .opacity)
+                        )
+                    )
+            }
+
+            if widgets.count > 1 {
+                pageIndicator(current: index, of: count)
+            }
+        }
+        .clipped()
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("expanded.pager")
+    }
+
+    /// A small vertical dot column showing which page is on screen.
+    ///
+    /// Without it a widget list of one and a widget list of many look the same until the user
+    /// scrolls, and there is no cue that scrolling does anything.
+    private func pageIndicator(current: Int, of count: Int) -> some View {
+        VStack(spacing: 4) {
+            ForEach(0..<count, id: \.self) { i in
+                Circle()
+                    .fill(.white.opacity(i == current ? 0.9 : 0.25))
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .padding(.trailing, 4)
+        .accessibilityIdentifier("expanded.pager.indicator")
+    }
+
 }
