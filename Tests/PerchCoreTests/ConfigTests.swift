@@ -307,7 +307,9 @@ struct WidgetConfigTests {
 
     @Test("Declaring the same widget twice does not duplicate it")
     func widgetsAreDeduplicated() {
-        let result = ConfigLoader.load(source: "widget = media\nwidget = media")
+        // Start from an explicitly-cleared list rather than the defaults, so this test is about
+        // dedup only and not about which widgets happen to be on by default.
+        let result = ConfigLoader.load(source: "widget =\nwidget = media\nwidget = media")
 
         #expect(result.config.widgets == ["media"])
     }
