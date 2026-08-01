@@ -110,9 +110,9 @@ public struct Config: Equatable, Sendable {
     /// flat `key = value` grammar cannot express otherwise, and repeating a key is how every
     /// config format of this kind does it. `widget =` with no value clears the list.
     ///
-    /// Defaults to the media widget: zero configuration has to be worth shipping, and a notch that
-    /// shows nothing at all is not.
-    public var widgets: [String] = ["media"]
+    /// Defaults to media and notes: zero configuration has to be worth shipping, and a notch that
+    /// shows nothing at all is not. The two sit side-by-side in the expanded panel.
+    public var widgets: [String] = ["media", "notes"]
 
     /// Per-widget settings, keyed by widget kind then setting name.
     ///

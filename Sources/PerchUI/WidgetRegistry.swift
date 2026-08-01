@@ -24,6 +24,7 @@ public final class WidgetRegistry {
     public static func registerBuiltIns() {
         shared.register(MediaWidget.self)
         shared.register(ClockWidget.self)
+        shared.register(NotesWidget.self)
     }
 
     /// Register a widget type under its `kind`.

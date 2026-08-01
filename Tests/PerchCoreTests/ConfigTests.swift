@@ -307,7 +307,9 @@ struct WidgetConfigTests {
 
     @Test("Declaring the same widget twice does not duplicate it")
     func widgetsAreDeduplicated() {
-        let result = ConfigLoader.load(source: "widget = media\nwidget = media")
+        // Start from an explicitly-cleared list rather than the defaults, so this test is about
+        // dedup only and not about which widgets happen to be on by default.
+        let result = ConfigLoader.load(source: "widget =\nwidget = media\nwidget = media")
 
         #expect(result.config.widgets == ["media"])
     }
@@ -353,18 +355,18 @@ struct WidgetConfigTests {
         #expect(message.contains("widget = clock"))
     }
 
-    @Test("The media widget is on by default")
-    func mediaIsOnByDefault() {
+    @Test("Media and notes are on by default")
+    func defaultsAreShipped() {
         // Zero configuration has to be worth shipping, and a notch showing nothing is not.
-        #expect(Config().widgets == ["media"])
-        #expect(ConfigLoader.load(source: "").config.widgets == ["media"])
+        #expect(Config().widgets == ["media", "notes"])
+        #expect(ConfigLoader.load(source: "").config.widgets == ["media", "notes"])
     }
 
     @Test("Declaring widgets replaces nothing implicitly")
     func defaultSurvivesUnrelatedSettings() {
         let result = ConfigLoader.load(source: "open-on = click")
 
-        #expect(result.config.widgets == ["media"])
+        #expect(result.config.widgets == ["media", "notes"])
     }
 
     @Test("The longest matching widget prefix wins")

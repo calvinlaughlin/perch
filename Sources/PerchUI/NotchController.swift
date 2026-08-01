@@ -21,6 +21,7 @@ public final class NotchController: NotchAttention {
     private var screenObservation: Task<Void, Never>?
     private var hoverSettleTask: Task<Void, Never>?
     private var peekExpiryTask: Task<Void, Never>?
+    private var scrollMonitor: Any?
 
     public init(
         config: Config = Config(),
@@ -68,6 +69,36 @@ public final class NotchController: NotchAttention {
                 self.rebuild()
             }
         }
+
+        installScrollMonitor()
+    }
+
+    /// Watch every scroll event the app sees and route the ones landing on the notch to the pager.
+    ///
+    /// A local monitor rather than a `scrollWheel` override on the hosting view because SwiftUI
+    /// widgets can contain their own scroll views — `TextEditor` is one — and those swallow the
+    /// wheel event before it ever reaches our container. The monitor sees the event first, decides
+    /// whether it is destined for us, and returns nil to consume it so the inner scroll view never
+    /// gets a look.
+    private func installScrollMonitor() {
+        guard scrollMonitor == nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) {
+            [weak self] event in
+            guard let self, let panel = self.panel, event.window === panel else { return event }
+            guard self.model.state == .expanded else { return event }
+
+            // The event's location is in window coordinates with y-up. Convert to the SwiftUI
+            // layout space the interactive rect is expressed in, exactly the way NotchHostingView
+            // does for its own hit tests.
+            let location = event.locationInWindow
+            let inRect = self.model.activeRect.contains(
+                CGPoint(x: location.x, y: panel.frame.height - location.y)
+            )
+            guard inRect else { return event }
+
+            self.scrolled(deltaY: event.scrollingDeltaY)
+            return nil
+        }
     }
 
     /// Tear everything down.
@@ -78,6 +109,10 @@ public final class NotchController: NotchAttention {
         screenObservation = nil
         hoverSettleTask?.cancel()
         hoverSettleTask = nil
+        if let scrollMonitor {
+            NSEvent.removeMonitor(scrollMonitor)
+            self.scrollMonitor = nil
+        }
         host.shutdown()
         panel?.orderOut(nil)
         panel = nil
@@ -153,6 +188,41 @@ public final class NotchController: NotchAttention {
         deliver(.clicked)
     }
 
+    /// A scroll gesture landed on the notch.
+    ///
+    /// Only meaningful while the panel is open: collapsed there is nothing to page between, and a
+    /// peek is an announcement not an interaction. Accumulates deltas until they cross the paging
+    /// threshold, then advances one page and consumes the accumulator. Direction reversal wipes
+    /// the accumulator so an up-then-down never cancels itself into nothing.
+    private func scrolled(deltaY: CGFloat) {
+        guard model.state == .expanded else { return }
+
+        let widgets = host.widgets(at: .expanded)
+        guard widgets.count > 1 else { return }
+
+        if deltaY.sign != model.expandedScrollAccumulator.sign {
+            model.expandedScrollAccumulator = 0
+        }
+        model.expandedScrollAccumulator += deltaY
+
+        // Chosen empirically: small enough that a deliberate flick pages, large enough that stray
+        // pixels — the sort a trackpad emits at rest, and momentum tail-off — do not.
+        let threshold: CGFloat = 20
+        guard abs(model.expandedScrollAccumulator) >= threshold else { return }
+
+        // Scroll direction follows finger direction: fingers moving down advances to the next
+        // page, fingers moving up returns to the previous. Under macOS "natural" scrolling that
+        // means a negative `scrollingDeltaY` (surface moving down under the finger) goes forward.
+        let step = model.expandedScrollAccumulator < 0 ? 1 : -1
+        model.expandedScrollAccumulator = 0
+
+        let next = min(max(model.expandedPageIndex + step, 0), widgets.count - 1)
+        guard next != model.expandedPageIndex else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            model.expandedPageIndex = next
+        }
+    }
+
     /// Push an event through the state machine and reflect any change in the view.
     private func deliver(_ event: NotchEvent) {
         let previous = machine.state
@@ -166,6 +236,26 @@ public final class NotchController: NotchAttention {
 
         host.notchStateChanged(to: machine.state)
         syncInteractiveRect()
+        syncKeyStatus()
+    }
+
+    /// Match the panel's willingness to accept keyboard input to whether it is actually open.
+    ///
+    /// Expanded is the only state where a widget can plausibly want typing — the collapsed strip
+    /// has no text field, and a peek is announcing something you did not ask to see. Making the
+    /// panel key any earlier would steal focus from the user's real work, which is exactly what
+    /// `.nonactivatingPanel` was chosen to prevent.
+    private func syncKeyStatus() {
+        guard let panel else { return }
+        if machine.state == .expanded {
+            panel.focusable = true
+            panel.makeKey()
+        } else if panel.isKeyWindow {
+            panel.focusable = false
+            panel.resignKey()
+        } else {
+            panel.focusable = false
+        }
     }
 
     // MARK: - Panel lifecycle
