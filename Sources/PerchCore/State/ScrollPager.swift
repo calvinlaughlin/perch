@@ -88,7 +88,12 @@ public struct ScrollPager: Equatable, Sendable {
     private mutating func turn(by delta: CGFloat, latching: Bool) -> Int {
         // Reversing direction abandons whatever was building up, so a nudge back the other way
         // never sticks around to be spent on a later scroll.
-        if (delta < 0) != (accumulated < 0) { accumulated = 0 }
+        //
+        // A zero delta is not a reversal. It has no direction to disagree with, and a trackpad
+        // emits one whenever a finger rests still for a frame — treating that as a change of mind
+        // throws away a scroll the user is in the middle of making, so a slow deliberate movement
+        // keeps losing its total and never reaches the threshold at all.
+        if delta != 0, accumulated != 0, (delta < 0) != (accumulated < 0) { accumulated = 0 }
         accumulated += delta
 
         guard abs(accumulated) >= threshold else { return 0 }

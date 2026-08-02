@@ -111,9 +111,9 @@ public final class NotchController: NotchAttention {
             // dead from then on.
             let isBoundary = phase == .began || phase == .ended
 
-            // Vertical scrolling moves the cards. The deck travels sideways on screen, so the
-            // gesture and the motion are on different axes — deliberately, because scrolling up and
-            // down is what a hand reaches for on a notch, whatever direction the result slides in.
+            // Vertical scrolling moves the cards, and the deck slides vertically to match. A
+            // horizontal swipe is left alone and passed on, so a sideways gesture that happens to
+            // cross the notch on its way somewhere else is not swallowed by it.
             let isVertical = abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX)
 
             guard isVertical || isBoundary else { return event }
@@ -240,8 +240,6 @@ public final class NotchController: NotchAttention {
         guard widgets.count > 1 else { return }
 
         let step = pager.scrolled(delta: delta, phase: phase)
-        Log.widget.info(
-            "scrolled: step=\(step) widgets=\(widgets.count) index=\(self.model.expandedPageIndex)")
         guard step != 0 else { return }
 
         // The only difference between the two behaviours, and the reason this is one key rather

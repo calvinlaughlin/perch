@@ -41,9 +41,12 @@ struct NotchContentView: View {
 
     /// Widgets in the body of the open panel, below the camera housing.
     ///
-    /// One widget faces the reader at a time, with the edges of its neighbours showing; swiping
-    /// sideways moves between them. The choice is remembered on `model.expandedPageIndex`, so a
-    /// close-and-reopen returns to the same card rather than snapping back to the first.
+    /// One widget faces the reader at a time and scrolling vertically moves between them, one per
+    /// gesture. The choice is remembered on `model.expandedPageIndex`, so a close-and-reopen
+    /// returns to the same card rather than snapping back to the first.
+    ///
+    /// That is the deliberate compromise for a panel this small: two widgets crammed side-by-side
+    /// each get less than half the width, but one at a time gets the full row.
     private var expandedContent: some View {
         let rect = model.layout.expandedRect
         let housingHeight = model.layout.hardwareRect.height

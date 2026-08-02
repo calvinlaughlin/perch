@@ -102,6 +102,20 @@ struct ScrollPagerTests {
         #expect(pager.scrolled(delta: -19, phase: .changed) == 0)
     }
 
+    @Test("A finger resting still does not throw away the scroll under it")
+    func stillFingerKeepsTheTotal() {
+        // A zero delta has no direction, so it cannot be a reversal — but comparing it by sign says
+        // otherwise, because zero is not negative. A trackpad emits these whenever a finger holds
+        // still for a frame, which a slow deliberate scroll does constantly, so reading them as a
+        // change of mind wipes the total over and over and the card never turns at all.
+        var pager = ScrollPager()
+        #expect(pager.scrolled(delta: -12, phase: .began) == 0)
+        #expect(pager.scrolled(delta: 0, phase: .changed) == 0)
+
+        // -12 and -12 is past the threshold. Only the pause sat between them.
+        #expect(pager.scrolled(delta: -12, phase: .changed) == 1)
+    }
+
     @Test("A gesture whose end never arrives leaves the deck dead")
     func swallowedEndJamsTheLatch() {
         // Not a wish, a warning. The latch is released by `.ended` and nothing else, so anything
