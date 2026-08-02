@@ -73,6 +73,7 @@ so it cannot drift out of date with what perch actually does.
 |---|---|---|
 | `open-on` | `hover` \| `click` \| `never` | `hover` |
 | `open-delay` | duration | `120ms` |
+| `expanded-scroll` | `endless` \| `rewind` | `endless` |
 | `haptics` | `never` \| `open` \| `peek` \| `all` | `never` |
 | `haptic-pattern` | `generic` \| `alignment` \| `level-change` | `alignment` |
 
@@ -84,6 +85,32 @@ open every time you cross the top of the screen on the way to the menu bar. Igno
 
 Clicking toggles the panel even when `open-on` is `hover`, so there is always a way to dismiss it
 without moving the pointer off it.
+
+#### Scrolling between widgets
+
+The open panel shows one widget at a time. Scrolling vertically over it moves to the next, one per
+swipe however hard the swipe is thrown — a panel this small showing four widgets go past on one
+flick is a panel you have to scroll back through.
+
+`expanded-scroll` is what happens at the ends of the list.
+
+```ini
+expanded-scroll = rewind
+```
+
+`endless`, the default, has no ends: scrolling down past the last widget carries on downwards into
+the first, and up past the first carries on up into the last. Nothing ever turns round.
+
+`rewind` treats the list as having a top and a bottom, and going past either sweeps back to the
+other. The movement is visibly a return rather than a continuation, which is the point of choosing
+it — with two or three widgets it can be easier to keep your place when the panel tells you you
+have been all the way round.
+
+Neither refuses to scroll. Being stopped dead at an end reads as broken rather than as an end,
+because a panel showing one widget at a time has nothing on screen to say there is an end there.
+
+A wheel mouse turns one widget per few detents rather than per gesture, since it emits no gesture
+to latch onto.
 
 #### Haptics
 
@@ -99,6 +126,11 @@ haptic-pattern = level-change
 Only transitions *into* an open or announcing state tap. Collapsing does not — by the time the
 notch closes the pointer has already left it, and a tap chasing you away tells you nothing you did
 not just do on purpose.
+
+Scrolling from one widget to the next taps too, whenever haptics are on at all — `open` and `peek`
+do not gate it. Those two are about being notified, which is a taste; a widget turning under your
+own fingers is feedback for a movement you are in the middle of making, and it always uses
+`level-change` whatever `haptic-pattern` says, because that is the detent it is imitating.
 
 `haptic-pattern` picks how the tap feels, from the three patterns macOS ships: `alignment` is the
 light tap of something snapping to a guide, `generic` a single firmer one, and `level-change` the

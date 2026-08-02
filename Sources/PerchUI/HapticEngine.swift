@@ -39,6 +39,12 @@ public struct HapticEngine {
         guard let pattern = policy.pattern(from: previous, to: current) else { return }
         performer(pattern)
     }
+
+    /// Tap for a card reaching the next stop on the spindle.
+    public func performCardTurn(_ policy: HapticPolicy) {
+        guard let pattern = policy.patternForCardTurn() else { return }
+        performer(pattern)
+    }
 }
 
 extension HapticPattern {

@@ -51,6 +51,12 @@ public struct Config: Equatable, Sendable {
     /// the only setting that is right for everyone.
     public var haptics: HapticTrigger = .never
 
+    /// What scrolling does at the end of the expanded widgets.
+    ///
+    /// Defaults to endless. A panel this small shows one widget at a time, so reaching an end and
+    /// being refused is a dead scroll with nothing on screen explaining why.
+    public var expandedScroll: ExpandedScroll = .endless
+
     /// How a tap feels.
     ///
     /// `alignment` is the lightest of the three, and the notch opening is a small event.
