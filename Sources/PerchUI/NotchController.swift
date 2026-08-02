@@ -23,6 +23,9 @@ public final class NotchController: NotchAttention {
     private var peekExpiryTask: Task<Void, Never>?
     private var scrollMonitor: Any?
 
+    /// Decides when a stream of scroll events amounts to turning a card.
+    private var pager = ScrollPager()
+
     public init(
         config: Config = Config(),
         host: WidgetHost = WidgetHost(),
@@ -96,9 +99,45 @@ public final class NotchController: NotchAttention {
             )
             guard inRect else { return event }
 
-            self.scrolled(deltaY: event.scrollingDeltaY)
-            return nil
+            let phase = Self.phase(of: event)
+
+            // The start and end of a gesture carry no movement at all, so they cannot be filtered
+            // by which way they point — and they are exactly the ones the pager needs, because
+            // `.ended` is what releases its one-card-per-gesture latch. Judge those on being
+            // boundaries; judge everything else on its axis.
+            //
+            // Getting this wrong does not look like a filtering bug. The latch is set by the first
+            // swipe and then never released, so precisely one card change works and the deck is
+            // dead from then on.
+            let isBoundary = phase == .began || phase == .ended
+
+            // Vertical scrolling moves the cards. The deck travels sideways on screen, so the
+            // gesture and the motion are on different axes — deliberately, because scrolling up and
+            // down is what a hand reaches for on a notch, whatever direction the result slides in.
+            let isVertical = abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX)
+
+            guard isVertical || isBoundary else { return event }
+
+            self.scrolled(delta: event.scrollingDeltaY, phase: phase)
+
+            // Consume only what was actually used.
+            return isVertical ? nil : event
         }
+    }
+
+    /// Which part of a gesture an AppKit scroll event belongs to.
+    ///
+    /// AppKit splits this across two separate masks, and the order of the checks is what makes the
+    /// distinction usable. `momentumPhase` is tested first because an event coasting after the
+    /// fingers left still carries a `phase` of `.changed` — read the wrong one first and the coast
+    /// is indistinguishable from the gesture, which is precisely how one flick turns the whole
+    /// wheel. An event with neither mask set is a wheel mouse, which has no gesture at all.
+    private static func phase(of event: NSEvent) -> ScrollPager.Phase {
+        if !event.momentumPhase.isEmpty { return .momentum }
+        if event.phase.contains(.began) { return .began }
+        if event.phase.contains(.ended) || event.phase.contains(.cancelled) { return .ended }
+        if event.phase.contains(.changed) { return .changed }
+        return .discrete
     }
 
     /// Tear everything down.
@@ -188,37 +227,46 @@ public final class NotchController: NotchAttention {
         deliver(.clicked)
     }
 
-    /// A scroll gesture landed on the notch.
+    /// A scroll event landed on the notch.
     ///
-    /// Only meaningful while the panel is open: collapsed there is nothing to page between, and a
-    /// peek is an announcement not an interaction. Accumulates deltas until they cross the paging
-    /// threshold, then advances one page and consumes the accumulator. Direction reversal wipes
-    /// the accumulator so an up-then-down never cancels itself into nothing.
-    private func scrolled(deltaY: CGFloat) {
+    /// Only meaningful while the panel is open: collapsed there is nothing to turn between, and a
+    /// peek is an announcement rather than an interaction. Whether a given event actually turns a
+    /// card is `ScrollPager`'s decision, which is where the awkward part lives and where it can be
+    /// tested; this only carries the answer out to the model, the animation, and the trackpad.
+    private func scrolled(delta: CGFloat, phase: ScrollPager.Phase) {
         guard model.state == .expanded else { return }
 
         let widgets = host.widgets(at: .expanded)
         guard widgets.count > 1 else { return }
 
-        if deltaY.sign != model.expandedScrollAccumulator.sign {
-            model.expandedScrollAccumulator = 0
-        }
-        model.expandedScrollAccumulator += deltaY
+        let step = pager.scrolled(delta: delta, phase: phase)
+        Log.widget.info(
+            "scrolled: step=\(step) widgets=\(widgets.count) index=\(self.model.expandedPageIndex)")
+        guard step != 0 else { return }
 
-        // Chosen empirically: small enough that a deliberate flick pages, large enough that stray
-        // pixels — the sort a trackpad emits at rest, and momentum tail-off — do not.
-        let threshold: CGFloat = 20
-        guard abs(model.expandedScrollAccumulator) >= threshold else { return }
-
-        // Scroll direction follows finger direction: fingers moving down advances to the next
-        // page, fingers moving up returns to the previous. Under macOS "natural" scrolling that
-        // means a negative `scrollingDeltaY` (surface moving down under the finger) goes forward.
-        let step = model.expandedScrollAccumulator < 0 ? 1 : -1
-        model.expandedScrollAccumulator = 0
-
-        let next = min(max(model.expandedPageIndex + step, 0), widgets.count - 1)
+        // The only difference between the two behaviours, and the reason this is one key rather
+        // than two implementations. Endless leaves the index running free on a slot line that never
+        // ends; rewind folds it back into the widget list, which the deck then reaches by sliding
+        // across everything in between. The view draws both without knowing which it is showing.
+        let next =
+            switch config.expandedScroll {
+            case .endless:
+                model.expandedPageIndex + step
+            case .rewind:
+                NotchModel.card(
+                    at: model.expandedPageIndex + step, of: widgets.count)
+            }
         guard next != model.expandedPageIndex else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+
+        // Tapped as the turn begins rather than when the animation settles. The tap is meant to
+        // land with the finger that caused it — a detent felt a third of a second late reads as a
+        // second, unexplained event rather than as the card reaching its stop.
+        haptics.performCardTurn(config.hapticPolicy)
+
+        // A short spring with a little give, so the deck arrives with some weight rather than
+        // stopping dead. Nothing here is rasterised or rotated, so unlike the turn this replaced,
+        // the movement can afford to be watched.
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
             model.expandedPageIndex = next
         }
     }

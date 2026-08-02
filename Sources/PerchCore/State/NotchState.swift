@@ -25,6 +25,22 @@ public enum OpenTrigger: String, Equatable, Sendable, CaseIterable {
     case never
 }
 
+/// What happens when scrolling reaches the end of the expanded widgets.
+public enum ExpandedScroll: String, Equatable, Sendable, CaseIterable {
+
+    /// Keep going. The widgets repeat, so there is no end to reach.
+    ///
+    /// Scrolling past the last one carries on in the same direction into the first, rather than
+    /// turning round — so the motion never contradicts the gesture that caused it.
+    case endless
+
+    /// Return to the first widget, travelling back across the others to get there.
+    ///
+    /// Slower, and it says where you are: nothing else on a panel this size tells you the deck has
+    /// a beginning, and arriving back at it is the only moment that can.
+    case rewind
+}
+
 /// Things that can happen to the notch.
 public enum NotchEvent: Equatable, Sendable {
     /// The pointer arrived over the notch. Records position; does not open anything.

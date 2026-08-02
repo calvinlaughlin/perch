@@ -137,6 +137,17 @@ public enum ConfigSchema {
             describe: { $0.peekOnTrackChange ? "true" : "false" }
         ),
         ConfigKey(
+            name: "expanded-scroll",
+            section: "Interaction",
+            syntax: ExpandedScroll.allCases.map(\.rawValue).joined(separator: " | "),
+            documentation: """
+                What scrolling does past the last widget in the expanded panel. `endless` carries \
+                on into the first; `rewind` travels back across the deck to reach it.
+                """,
+            apply: { $0.expandedScroll = try ConfigValue.enumeration($1) },
+            describe: { $0.expandedScroll.rawValue }
+        ),
+        ConfigKey(
             name: "corner-radius",
             section: "Shape",
             syntax: "points",

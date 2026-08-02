@@ -41,17 +41,16 @@ struct NotchContentView: View {
 
     /// Widgets in the body of the open panel, below the camera housing.
     ///
-    /// One widget is shown at a time; scrolling vertically inside the panel moves between them and
-    /// the choice is remembered on `model.expandedPageIndex` so a close-and-reopen returns to the
-    /// same one. That is the deliberate compromise for a panel this small: two widgets crammed
-    /// side-by-side each get less than half the width, but one at a time gets the full row.
+    /// One widget faces the reader at a time, with the edges of its neighbours showing; swiping
+    /// sideways moves between them. The choice is remembered on `model.expandedPageIndex`, so a
+    /// close-and-reopen returns to the same card rather than snapping back to the first.
     private var expandedContent: some View {
         let rect = model.layout.expandedRect
         let housingHeight = model.layout.hardwareRect.height
         let inset: CGFloat = 10
         let widgets = host.widgets(at: .expanded)
 
-        return ExpandedPager(model: model, widgets: widgets)
+        return ExpandedDeck(model: model, widgets: widgets)
             .frame(
                 width: max(0, rect.width - inset * 2),
                 // Start below the housing: content drawn behind it is content nobody can see.
@@ -127,65 +126,66 @@ struct NotchContentView: View {
     }
 }
 
-// MARK: - Expanded pager
+// MARK: - Expanded deck
 
-/// Shows one expanded widget at a time and switches between them on a vertical scroll.
+/// Shows the expanded widgets as an endless deck of cards sliding vertically.
 ///
-/// The panel itself never resizes (see `NotchShape` comments), so a scrolling *pager* rather than
-/// a scrolling *stack*: pages are the same size as the container, only one is on screen, and the
-/// transition slides one out as the other slides in. That way the panel always looks full and the
-/// user still gets to move between widgets without either being cropped.
-private struct ExpandedPager: View {
+/// Endless in the real sense: there is no last card to reach. `expandedPageIndex` is a position on
+/// a run of slots that goes on forever in both directions, and the widgets simply repeat underneath
+/// it — so scrolling down past the final widget carries on downwards into the first, rather than
+/// sweeping back up to the top. Nothing ever turns round, so nothing ever has to be told which way
+/// to turn.
+///
+/// Only the slots either side of the current one are built, and each is keyed by its slot number.
+/// That identity is the load-bearing part. Keyed by slot, a card that scrolls out of the window is
+/// removed and a new one inserted at the far end, both off screen; keyed by widget instead, SwiftUI
+/// would see the same view move from one end of the deck to the other and animate it travelling
+/// right across the panel to get there.
+///
+/// Nothing is rotated or rasterised on the way, so text stays crisp for the whole slide. That was
+/// the failing of the spindle this replaced — a card mid-turn is a texture, and a texture of text is
+/// a smear.
+private struct ExpandedDeck: View {
 
     @Bindable var model: NotchModel
     let widgets: [any NotchWidget]
 
+    /// The gap between cards, so the one arriving is not mistaken for more of the one leaving.
+    private let gap: CGFloat = 10
+
     var body: some View {
-        // Read the currently-selected page and clamp: a config reload can remove a widget, and an
-        // out-of-range index left over from the previous set must not crash the view.
-        let count = max(widgets.count, 1)
-        let index = min(max(model.expandedPageIndex, 0), max(widgets.count - 1, 0))
+        // Read out here, not inside the `GeometryReader`. Observation is established while the body
+        // is evaluated, and a `GeometryReader`'s closure runs later, during layout — state read only
+        // in there can fail to register as a dependency, which shows up as the index changing
+        // correctly while nothing on screen ever moves.
+        let index = model.expandedPageIndex
 
-        return ZStack(alignment: .trailing) {
-            if widgets.isEmpty {
-                Color.clear
-            } else {
-                // A transition rather than a real scroll view: SwiftUI's ScrollView would try to
-                // manage its own offset and paging feel, and a panel this small needs a single
-                // sharp snap between widgets, not free scrolling.
-                widgets[index].body
-                    .id(index)
-                    .transition(
-                        .asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .move(edge: .top).combined(with: .opacity)
-                        )
-                    )
-            }
+        return GeometryReader { proxy in
+            let face = proxy.size.height
+            let step = face + gap
 
-            if widgets.count > 1 {
-                pageIndicator(current: index, of: count)
+            ZStack(alignment: .top) {
+                // The window hands back the slot facing the reader and one either side, so the card
+                // arriving is already built and laid out before it is needed — and hands back
+                // nothing at all when there are no widgets, rather than a slot with no card on it.
+                ForEach(NotchModel.window(around: index, of: widgets.count)) { slot in
+                    widgets[slot.card].body
+                        // Every card is the same face, whatever is printed on it. Without this each
+                        // widget takes its own intrinsic height and the deck stops being a deck —
+                        // the slide would travel a different distance per card.
+                        .frame(width: proxy.size.width, height: face)
+                        .clipped()
+                        .offset(y: CGFloat(slot.offset) * step)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            // The whole run of slots shifts under the panel. Slot positions are absolute and never
+            // change, so this single offset is the only thing that animates — which is why the
+            // movement is continuous rather than a set of cards each deciding where to go.
+            .offset(y: -CGFloat(index) * step)
         }
         .clipped()
         .contentShape(Rectangle())
-        .accessibilityIdentifier("expanded.pager")
+        .accessibilityIdentifier("expanded.deck")
     }
-
-    /// A small vertical dot column showing which page is on screen.
-    ///
-    /// Without it a widget list of one and a widget list of many look the same until the user
-    /// scrolls, and there is no cue that scrolling does anything.
-    private func pageIndicator(current: Int, of count: Int) -> some View {
-        VStack(spacing: 4) {
-            ForEach(0..<count, id: \.self) { i in
-                Circle()
-                    .fill(.white.opacity(i == current ? 0.9 : 0.25))
-                    .frame(width: 4, height: 4)
-            }
-        }
-        .padding(.trailing, 4)
-        .accessibilityIdentifier("expanded.pager.indicator")
-    }
-
 }

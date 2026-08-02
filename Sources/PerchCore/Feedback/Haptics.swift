@@ -79,4 +79,24 @@ public struct HapticPolicy: Equatable, Sendable {
             return nil
         }
     }
+
+    /// The pattern for turning to another card, or nil if this one is silent.
+    ///
+    /// Deliberately not a fifth `HapticTrigger` case, and deliberately not the configured pattern.
+    ///
+    /// The two existing triggers are *notifications* — the notch telling you something happened
+    /// while you were looking elsewhere — and whether you want to be notified is a taste worth a
+    /// config key. A card turning under your own fingers is not that. It is feedback for a direct
+    /// manipulation, the tactile half of a movement you are in the middle of making, and a rolodex
+    /// that turned silently under your hand would feel broken rather than restrained. So it follows
+    /// the one question already answered: are haptics on at all.
+    ///
+    /// The pattern is always `levelChange` for the same reason. It is documented as the two-part
+    /// tap of a detent moving between stops, which is exactly what a card reaching the next stop on
+    /// a spindle is — where `generic` and `alignment` are the vocabulary of notification and
+    /// snapping. Honouring the configured pattern here would let a config say "announce with a
+    /// firm tap" and get a firm tap per card, which is nobody's intent.
+    public func patternForCardTurn() -> HapticPattern? {
+        trigger == .never ? nil : .levelChange
+    }
 }
