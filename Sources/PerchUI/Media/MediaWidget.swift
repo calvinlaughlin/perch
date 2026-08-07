@@ -121,7 +121,8 @@ public final class MediaWidget: NotchWidget {
         AnyView(MediaWidgetView(widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize))
     }
 
-    public var peekBody: AnyView {
+    /// Media announces, so it has a peek: the track that just started, and nothing else.
+    public var peekBody: AnyView? {
         AnyView(
             MediaPeekView(widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize - 12))
     }

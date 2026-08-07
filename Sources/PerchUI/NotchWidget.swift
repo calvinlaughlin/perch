@@ -61,11 +61,16 @@ public protocol NotchWidget: AnyObject {
     /// What to draw.
     var body: AnyView { get }
 
-    /// What to draw during a peek.
+    /// What to draw during a peek, or `nil` if this widget has nothing to announce.
     ///
-    /// Defaults to `body`. Override when a widget has something more suitable to say in the two
-    /// seconds it gets — a peek is glanced at, not read.
-    var peekBody: AnyView { get }
+    /// **`nil` by default, and that is the point.** A peek is an announcement — the notch swelling
+    /// unbidden to say something changed — so appearing in one is opt-in, exactly like the
+    /// `runsWhileHidden` a widget needs in order to notice a change in the first place. A widget
+    /// that has never announced anything has nothing to say in the two seconds a peek lasts, and
+    /// putting it there means a track change hands you a scratchpad.
+    ///
+    /// Override to return a compact form of what just changed. A peek is glanced at, not read.
+    var peekBody: AnyView? { get }
 
     /// A one-line description, for the generated starter config.
     static var summary: String { get }
@@ -93,7 +98,7 @@ public protocol NotchWidget: AnyObject {
 extension NotchWidget {
     public func attach(attention: any NotchAttention) {}
     public var runsWhileHidden: Bool { false }
-    public var peekBody: AnyView { body }
+    public var peekBody: AnyView? { nil }
     public static var summary: String { "" }
     public static var settings: [WidgetSetting] { [] }
 }
