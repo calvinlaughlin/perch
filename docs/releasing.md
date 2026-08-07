@@ -108,7 +108,7 @@ Once a notarised zip is attached to a GitHub release and the repository is publi
 
 ```ruby
 cask "perch" do
-  version "0.1.0"
+  version "0.2.0"
   sha256 "..."
   url "https://github.com/calvinlaughlin/perch/releases/download/v#{version}/perch-#{version}.zip"
   name "perch"
