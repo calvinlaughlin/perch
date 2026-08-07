@@ -430,6 +430,36 @@ scenario(
     }
 }
 
+scenario(
+    "media-text = false",
+    config: """
+        open-on = never
+        collapsed-bleed = 90
+        widget = media
+        media-placement = leading
+        media-artwork-size = 22
+        media-text = false
+        """
+) { app in
+    // Drawn in the strip rather than the panel so this stays passive: no pointer, no click, and
+    // the notch never has to open.
+    let artwork =
+        element(withIdentifier: "media.artwork", in: app)
+        ?? element(withIdentifier: "media.artwork.missing", in: app)
+
+    // The artwork view exists only on the branch that renders a track. Without it, a missing title
+    // proves nothing — it would be missing with the setting on too, because nothing is playing.
+    guard artwork != nil else {
+        print("  skipped — nothing playing, so an absent title would prove nothing")
+        skippedScenarios += 1
+        return
+    }
+
+    check(element(withIdentifier: "media.title", in: app) == nil, "the title is not drawn")
+    check(element(withIdentifier: "media.artist", in: app) == nil, "the artist is not drawn")
+    check(artwork != nil, "the rest of the widget still draws")
+}
+
 // Multi-display. Skipped with one screen rather than silently passing, so a green run on a
 // single-display machine never reads as "multi-display works".
 if NSScreen.screens.count > 1,

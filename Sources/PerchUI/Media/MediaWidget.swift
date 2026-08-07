@@ -22,12 +22,16 @@ public final class MediaWidget: NotchWidget {
         WidgetSetting(
             name: "artwork-size", syntax: "points", defaultValue: "56",
             documentation: "Size of the album art."),
+        WidgetSetting(
+            name: "text", syntax: "true | false", defaultValue: "true",
+            documentation: "Show the track title and artist."),
     ]
 
     public let placement: Placement
 
     private let showsArtwork: Bool
     private let artworkSize: CGFloat
+    private let showsText: Bool
 
     private var source: (any MediaSource)?
     private var listener: Task<Void, Never>?
@@ -58,6 +62,10 @@ public final class MediaWidget: NotchWidget {
         placement = try settings.enumeration("placement", default: .expanded)
         showsArtwork = try settings.bool("artwork", default: true)
         artworkSize = try settings.length("artwork-size", default: 56)
+        // Defaults on, unlike haptics: the panel is something you opened deliberately, and a media
+        // widget that shows the album but not the song is a worse zero-configuration state than the
+        // reverse. This is for people who want the artwork alone, or nothing but the controls.
+        showsText = try settings.bool("text", default: true)
     }
 
     /// Media keeps working while hidden.
@@ -118,12 +126,17 @@ public final class MediaWidget: NotchWidget {
     }
 
     public var body: AnyView {
-        AnyView(MediaWidgetView(widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize))
+        AnyView(
+            MediaWidgetView(
+                widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize,
+                showsText: showsText))
     }
 
     public var peekBody: AnyView {
         AnyView(
-            MediaPeekView(widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize - 12))
+            MediaPeekView(
+                widget: self, showsArtwork: showsArtwork, artworkSize: artworkSize - 12,
+                showsText: showsText))
     }
 
     /// Peek when the track changes, but not for every update.
@@ -136,6 +149,10 @@ public final class MediaWidget: NotchWidget {
             lastAnnouncedTrack = nil
             return
         }
+
+        // With both artwork and text switched off there is nothing for a peek to say, and an empty
+        // panel dropping down on every track change is worse than no announcement at all.
+        guard showsArtwork || showsText else { return }
 
         let identity = "\(current.bundleIdentifier)|\(current.title ?? "")|\(current.artist ?? "")"
         guard identity != lastAnnouncedTrack else { return }
@@ -184,12 +201,13 @@ private struct MediaWidgetView: View {
     let widget: MediaWidget
     let showsArtwork: Bool
     let artworkSize: CGFloat
+    let showsText: Bool
 
     var body: some View {
         if let playing = widget.playing, playing.isPresentable {
             HStack(spacing: 12) {
                 if showsArtwork { artworkView }
-                details(for: playing)
+                if showsText { details(for: playing) }
                 Spacer(minLength: 0)
                 controls
             }
@@ -269,6 +287,7 @@ private struct MediaPeekView: View {
     let widget: MediaWidget
     let showsArtwork: Bool
     let artworkSize: CGFloat
+    let showsText: Bool
 
     var body: some View {
         let track = widget.peekSnapshot ?? widget.playing
@@ -288,18 +307,20 @@ private struct MediaPeekView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(track?.title ?? "")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("media.peek.title")
-
-                if let artist = track?.artist, !artist.isEmpty {
-                    Text(artist)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.6))
+            if showsText {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(track?.title ?? "")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
                         .lineLimit(1)
+                        .accessibilityIdentifier("media.peek.title")
+
+                    if let artist = track?.artist, !artist.isEmpty {
+                        Text(artist)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(1)
+                    }
                 }
             }
             Spacer(minLength: 0)

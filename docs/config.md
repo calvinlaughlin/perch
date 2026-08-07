@@ -237,9 +237,16 @@ Spotify, browsers, anything that registers with macOS.
 | `media-placement` | `leading` \| `trailing` \| `expanded` | `expanded` |
 | `media-artwork` | `true` \| `false` | `true` |
 | `media-artwork-size` | points | `56` |
+| `media-text` | `true` \| `false` | `true` |
 
 Album art is decoded off the main thread and downsampled to the size actually drawn, so a 3000px
 cover never becomes a 3000px bitmap.
+
+`media-artwork` and `media-text` are independent, so the widget can be artwork and controls, title
+and controls, or controls alone. Both cover the announcement as well as the panel — and with both
+off a track change stops peeking altogether, since an empty panel dropping down twice an album is
+worse than no announcement at all. The empty state still says "Nothing playing": a blank panel is
+indistinguishable from a broken one.
 
 Unlike most widgets, media keeps working while the notch is closed. It has to: a track change
 cannot be announced by something that is not watching, and opening the notch should show the
