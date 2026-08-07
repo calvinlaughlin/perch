@@ -161,6 +161,11 @@ It never interrupts a panel you opened yourself.
 A peek shows a compact form — artwork and title, no controls — because it is glanced at rather
 than used. `peek-on-track-change = false` turns it off without affecting anything else.
 
+**Only the widget with something to announce appears in one**, whatever else you have configured
+into the panel. A track change is media's announcement; a scratchpad or a clock arriving alongside
+it is not announcing anything, and a peek is too short to read two things anyway. Widgets opt into
+peeks the same way they opt into running while hidden — by having something to say.
+
 ### Displays
 
 | Key | Accepts | Default |

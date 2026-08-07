@@ -66,14 +66,19 @@ struct NotchContentView: View {
     }
 
     /// Widgets in a peek: compact, centred, no controls.
+    ///
+    /// Only widgets with something to announce appear. A peek belongs to whatever just changed —
+    /// everything else configured into the panel is beside the point for the two seconds it is up,
+    /// and a scratchpad arriving because a track changed is not an announcement of anything.
     private var peekContent: some View {
         let rect = model.layout.peekRect
         let housingHeight = model.layout.hardwareRect.height
         let inset: CGFloat = 8
+        let announcements = host.widgets(at: .expanded).compactMap(\.peekBody)
 
         return HStack(spacing: inset) {
-            ForEach(Array(host.widgets(at: .expanded).enumerated()), id: \.offset) { _, widget in
-                widget.peekBody
+            ForEach(Array(announcements.enumerated()), id: \.offset) { _, peek in
+                peek
             }
         }
         .frame(
