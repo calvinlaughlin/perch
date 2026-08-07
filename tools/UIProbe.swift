@@ -430,6 +430,52 @@ scenario(
     }
 }
 
+scenario(
+    "notes is opt-in",
+    interaction: .driving,
+    config: """
+        open-on = hover
+        """
+) { app in
+    // Deliberately an empty config: this asserts what someone who has never written one gets.
+    // Driving, because notes only draws in the expanded panel — a closed notch would show no
+    // scratchpad whatever the default was, which is exactly the evidence a broken version also
+    // produces.
+    movePointer(to: onTheNotch)
+    wait(2.5)
+
+    check(panelIsOpen(app), "the panel opened, so absence below means absence")
+    check(
+        element(withIdentifier: "notes.container", in: app) == nil,
+        "no scratchpad appears with no config file"
+    )
+
+    movePointer(to: parkingSpot)
+}
+
+scenario(
+    "notes when asked for",
+    interaction: .driving,
+    config: """
+        open-on = hover
+        widget = notes
+        """
+) { app in
+    movePointer(to: onTheNotch)
+    wait(2.5)
+
+    check(
+        element(withIdentifier: "notes.container", in: app) != nil,
+        "declaring it brings it back"
+    )
+    check(
+        panelIsOpen(app),
+        "media survives the declaration rather than being replaced by it"
+    )
+
+    movePointer(to: parkingSpot)
+}
+
 // Multi-display. Skipped with one screen rather than silently passing, so a green run on a
 // single-display machine never reads as "multi-display works".
 if NSScreen.screens.count > 1,

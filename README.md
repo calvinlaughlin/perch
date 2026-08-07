@@ -77,9 +77,9 @@ config file. Full reference: **[docs/config.md](docs/config.md)**.
 
 ## Widgets
 
-Two ship today — `media` and `clock`. A widget is one file: it declares a name, parses its own
-settings, says where it draws, and starts and stops its own work. Adding one needs no change to
-the config schema.
+Three ship today — `media`, `clock`, and `notes`. Only `media` is on by default; the rest are a
+line of config away. A widget is one file: it declares a name, parses its own settings, says where
+it draws, and starts and stops its own work. Adding one needs no change to the config schema.
 
 ```ini
 collapsed-bleed = 90         # make room beside the housing
@@ -93,7 +93,7 @@ See **[docs/writing-a-widget.md](docs/writing-a-widget.md)**.
 
 Working and in daily use, but early. Known gaps:
 
-- Only two widgets so far.
+- Only three widgets so far.
 - Rendering-level polish (as opposed to layout) is not covered by the automated checks — see
   [CONTRIBUTING.md](CONTRIBUTING.md#what-the-probes-cannot-see).
 

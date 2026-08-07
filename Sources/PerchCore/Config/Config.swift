@@ -116,9 +116,15 @@ public struct Config: Equatable, Sendable {
     /// flat `key = value` grammar cannot express otherwise, and repeating a key is how every
     /// config format of this kind does it. `widget =` with no value clears the list.
     ///
-    /// Defaults to media and notes: zero configuration has to be worth shipping, and a notch that
-    /// shows nothing at all is not. The two sit side-by-side in the expanded panel.
-    public var widgets: [String] = ["media", "notes"]
+    /// Defaults to media alone: zero configuration has to be worth shipping, and a notch that shows
+    /// nothing at all is not. Media earns the slot because it needs no setting up and says
+    /// something you did not already know.
+    ///
+    /// Notes is deliberately not in this list. It is a place to *put* things, and a widget that
+    /// stores what you type has to be asked for rather than found — a scratchpad nobody opted into
+    /// is a file on disk nobody knows they are writing. Declining it should also not require
+    /// restating the list, which is what being on by default costs.
+    public var widgets: [String] = ["media"]
 
     /// Per-widget settings, keyed by widget kind then setting name.
     ///
