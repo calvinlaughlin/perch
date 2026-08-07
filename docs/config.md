@@ -176,7 +176,7 @@ connected falls back to `notched` rather than leaving perch invisible.
 
 | Key | Accepts | Default |
 |---|---|---|
-| `expanded-height` | points | `88` |
+| `expanded-height` | points | `94` |
 | `expanded-width` | points | `420` |
 | `corner-radius` | points | `24` |
 | `collapsed-corner-radius` | points | `14` |
@@ -242,6 +242,20 @@ Spotify, browsers, anything that registers with macOS.
 
 Album art is decoded off the main thread and downsampled to the size actually drawn, so a 3000px
 cover never becomes a 3000px bitmap.
+
+The panel is one horizontal band: artwork on the left, and beside it the track, the transport
+controls at the right edge, and a scrubber with the elapsed time and the length flanking it. Laid
+out sideways rather than stacked because the panel hangs off the notch and is much wider than it is
+tall — height is the axis worth spending carefully, which is why the times sit beside the bar
+instead of under it.
+
+Dragging or clicking the scrubber seeks, and the bar follows your pointer rather than the player,
+since the player reports nothing until you let go. A track whose length the player does not
+report — live streams, most browser audio — gets no scrubber at all rather than a bar that cannot
+say where it is.
+
+Lower `expanded-height` much below its default and the scrubber is the first thing to run out of
+room.
 
 Unlike most widgets, media keeps working while the notch is closed. It has to: a track change
 cannot be announced by something that is not watching, and opening the notch should show the

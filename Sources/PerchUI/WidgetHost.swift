@@ -19,6 +19,13 @@ public final class WidgetHost {
     /// Which widgets are currently doing work.
     private var active: Set<ObjectIdentifier> = []
 
+    /// Which widgets are currently drawn where someone can see them.
+    ///
+    /// A subset of `active`, and the distinction matters for exactly one reason: a widget with
+    /// `runsWhileHidden` is active behind a closed notch, and anything it does purely to move
+    /// pixels — a progress bar, a marquee — would otherwise run there forever.
+    private var visible: Set<ObjectIdentifier> = []
+
     /// Whether the notch is visible at all.
     ///
     /// False while the display sleeps.
@@ -94,15 +101,42 @@ public final class WidgetHost {
         }
     }
 
+    /// Whether a widget's `body` is currently on screen.
+    ///
+    /// The strips are drawn while the notch is collapsed and faded out when it opens; the expanded
+    /// body is the reverse. A peek draws `peekBody`, which is a different view — so nothing counts
+    /// as visible during one.
+    private func isVisible(_ widget: any NotchWidget) -> Bool {
+        guard isOnScreen else { return false }
+
+        return switch widget.placement {
+        case .leading, .trailing: state == .collapsed
+        case .expanded: state == .expanded
+        }
+    }
+
     private func syncActivation() {
         for widget in widgets {
             let identifier = ObjectIdentifier(widget)
             let wants = shouldRun(widget)
+            let shows = wants && isVisible(widget)
 
             if wants, !active.contains(identifier) {
                 widget.activate()
                 active.insert(identifier)
-            } else if !wants, active.contains(identifier) {
+            }
+
+            // Visibility is settled before a deactivation and after an activation, so a widget is
+            // never told it is on screen while it is stopped.
+            if shows, !visible.contains(identifier) {
+                widget.setVisible(true)
+                visible.insert(identifier)
+            } else if !shows, visible.contains(identifier) {
+                widget.setVisible(false)
+                visible.remove(identifier)
+            }
+
+            if !wants, active.contains(identifier) {
                 widget.deactivate()
                 active.remove(identifier)
             }
@@ -111,8 +145,10 @@ public final class WidgetHost {
 
     private func deactivateAll() {
         for widget in widgets where active.contains(ObjectIdentifier(widget)) {
+            if visible.contains(ObjectIdentifier(widget)) { widget.setVisible(false) }
             widget.deactivate()
         }
         active.removeAll()
+        visible.removeAll()
     }
 }

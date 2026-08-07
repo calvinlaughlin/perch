@@ -82,6 +82,15 @@ public struct NowPlaying: Equatable, Sendable {
         return min(1, max(0, elapsed / duration))
     }
 
+    /// Where a scrubber dragged to `fraction` of its width is asking to go, in seconds.
+    ///
+    /// `nil` when the track has no known length, which is also when no scrubber should be on
+    /// screen: a bar with no end cannot say where two thirds along is.
+    public func seekTarget(fraction: Double) -> TimeInterval? {
+        guard let duration, duration > 0, fraction.isFinite else { return nil }
+        return duration * min(1, max(0, fraction))
+    }
+
     /// Whether there is enough here to show something meaningful.
     ///
     /// A payload with no title is a player that has registered but has nothing loaded — showing

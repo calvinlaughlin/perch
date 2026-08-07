@@ -183,6 +183,30 @@ func playbackIsPlaying() -> Bool? {
     return playing
 }
 
+/// Where the player says it has reached, and how long the track is.
+///
+/// Ground truth for a seek, from the same place `playbackIsPlaying` gets it. perch's own scrubber
+/// would move under the pointer whether or not anything reached the player — which is exactly the
+/// failure a wrong unit produces, since the bar lands where you dropped it and playback does not.
+func playbackPosition() -> (elapsed: TimeInterval, duration: TimeInterval)? {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+    task.arguments = [adapterScript.path, adapterFramework.path, "get"]
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    task.standardError = FileHandle.nullDevice
+    guard (try? task.run()) != nil else { return nil }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    task.waitUntilExit()
+
+    guard
+        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let elapsed = object["elapsedTime"] as? Double,
+        let duration = object["duration"] as? Double
+    else { return nil }
+    return (elapsed, duration)
+}
+
 // MARK: - Running perch under a scenario
 
 var failures: [String] = []
@@ -317,6 +341,64 @@ scenario(
     )
     check(element(withIdentifier: "media.toggle", in: app) != nil, "a play/pause control exists")
     check(element(withIdentifier: "media.next", in: app) != nil, "a next-track control exists")
+
+    // The layout, as numbers. A screenshot cannot tell a scrubber that spans the panel from one
+    // collapsed to nothing, and both look like "a bar is there" to a human glancing at it.
+    if let scrubber = element(withIdentifier: "media.scrubber", in: app),
+        let bar = screenFrame(of: scrubber)
+    {
+        check(bar.width > 300, "the scrubber spans the panel (\(Int(bar.width))pt)")
+        check(
+            element(withIdentifier: "media.elapsed", in: app) != nil
+                && element(withIdentifier: "media.duration", in: app) != nil,
+            "both ends of the track are labelled"
+        )
+
+        // Stacked, not overlapping. Content that runs past the panel is clipped rather than
+        // reported, so an overlap is invisible to everything except a comparison like this.
+        if let title = element(withIdentifier: "media.title", in: app).flatMap(screenFrame(of:)),
+            let toggle = element(withIdentifier: "media.toggle", in: app)
+                .flatMap(screenFrame(of:))
+        {
+            check(title.maxY <= bar.minY + 1, "the title sits above the scrubber")
+            check(
+                toggle.maxY <= bar.minY + 1,
+                "the controls sit clear of the bar, not on top of it"
+            )
+            check(toggle.minX > bar.midX, "the controls are at the right edge of the band")
+            check(
+                title.maxX <= toggle.minX + 1,
+                "a long title stops before the controls rather than under them"
+            )
+            check(
+                toggle.width >= 30 && toggle.height >= 28,
+                "the play control is a real target (\(Int(toggle.width))×\(Int(toggle.height))pt)"
+            )
+        }
+    } else {
+        check(false, "could not locate the scrubber")
+    }
+
+    // Seeking, checked against the player rather than against perch's own bar.
+    if let scrubber = element(withIdentifier: "media.scrubber", in: app),
+        let bar = screenFrame(of: scrubber),
+        let before = playbackPosition(), before.duration > 30
+    {
+        let fraction = 0.75
+        click(at: CGPoint(x: bar.minX + bar.width * fraction, y: bar.midY))
+        wait(1.5)
+
+        if let after = playbackPosition() {
+            let expected = after.duration * fraction
+            check(
+                abs(after.elapsed - expected) < 8,
+                "clicking three quarters along seeks there "
+                    + "(\(Int(before.elapsed))s → \(Int(after.elapsed))s, wanted ~\(Int(expected))s)"
+            )
+        } else {
+            check(false, "could not read the position back after seeking")
+        }
+    }
 
     if let toggle = element(withIdentifier: "media.toggle", in: app),
         let bounds = screenFrame(of: toggle),
