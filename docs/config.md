@@ -225,7 +225,9 @@ declare the widget first with 'widget = clock'
 Settings may appear above the `widget =` line that gives them meaning.
 
 **The media widget is enabled by default**, so perch shows what is playing with no config file at
-all.
+all. Everything else is opt-in, and declaring one adds to that default rather than replacing it —
+`widget = notes` on its own gives you media *and* notes. Use `widget =` first if you want to start
+from nothing.
 
 ### media
 
@@ -273,6 +275,26 @@ collapsed-bleed = 90
 widget = clock
 clock-placement = trailing
 ```
+
+### notes
+
+A scratchpad in the expanded panel. Opt-in: it is a place to *put* things, and a widget that keeps
+what you type has to be asked for rather than found.
+
+| Key | Accepts | Default |
+|---|---|---|
+| `notes-placement` | `expanded` | `expanded` |
+| `notes-placeholder` | text | `Jot something down…` |
+
+```ini
+widget = notes
+notes-placeholder = Later.
+```
+
+The note is a plain `notes.txt` beside your config, written a moment after you stop typing rather
+than on every keystroke, and re-read each time the panel opens — so editing the file in a real
+editor works, and does not lose whatever the panel had. Only `expanded` is a meaningful placement;
+the collapsed strip has no room to type.
 
 ## Only one perch
 

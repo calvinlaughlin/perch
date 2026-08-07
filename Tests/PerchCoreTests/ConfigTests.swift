@@ -355,18 +355,29 @@ struct WidgetConfigTests {
         #expect(message.contains("widget = clock"))
     }
 
-    @Test("Media and notes are on by default")
+    @Test("Media is on by default and notes is not")
     func defaultsAreShipped() {
-        // Zero configuration has to be worth shipping, and a notch showing nothing is not.
-        #expect(Config().widgets == ["media", "notes"])
-        #expect(ConfigLoader.load(source: "").config.widgets == ["media", "notes"])
+        // Zero configuration has to be worth shipping, and a notch showing nothing is not. Notes
+        // stays out: a widget that stores what you type has to be asked for.
+        #expect(Config().widgets == ["media"])
+        #expect(ConfigLoader.load(source: "").config.widgets == ["media"])
+    }
+
+    @Test("Notes is reachable by declaring it")
+    func notesIsOptIn() {
+        // Opting in must not cost you the default: naming a widget adds to the list rather than
+        // replacing it, so `widget = notes` alone keeps media.
+        let result = ConfigLoader.load(source: "widget = notes")
+
+        #expect(result.config.widgets == ["media", "notes"])
+        #expect(result.diagnostics.isEmpty)
     }
 
     @Test("Declaring widgets replaces nothing implicitly")
     func defaultSurvivesUnrelatedSettings() {
         let result = ConfigLoader.load(source: "open-on = click")
 
-        #expect(result.config.widgets == ["media", "notes"])
+        #expect(result.config.widgets == ["media"])
     }
 
     @Test("The longest matching widget prefix wins")
