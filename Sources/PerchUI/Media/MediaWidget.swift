@@ -32,6 +32,8 @@ public final class MediaWidget: NotchWidget {
     private var source: (any MediaSource)?
     private var listener: Task<Void, Never>?
     private var lingerTask: Task<Void, Never>?
+    private var ticker: Task<Void, Never>?
+    private var seekSettleTask: Task<Void, Never>?
 
     /// How long the helper keeps running after the notch closes.
     ///
@@ -54,6 +56,29 @@ public final class MediaWidget: NotchWidget {
     /// Freezing it means a peek says one thing for its whole duration.
     fileprivate private(set) var peekSnapshot: NowPlaying?
 
+    /// The moment the scrubber is drawn against.
+    ///
+    /// The system reports a position once per change rather than continuously, so a bar that is
+    /// going to move has to be told what time it is. Only advances while something is playing:
+    /// repainting a paused track twice a second is work nobody can see.
+    fileprivate private(set) var now = Date()
+
+    /// How far along the scrubber the pointer is, while a drag is in progress.
+    ///
+    /// The thumb follows the pointer rather than the player: a bar that only moves once the
+    /// player has caught up feels stuck, and the player will not report anything at all until the
+    /// drag ends.
+    fileprivate var dragFraction: Double?
+
+    /// Where playback was asked to go, held until the player agrees it went there.
+    ///
+    /// Without this the bar snaps back to the old position for the beat between letting go and the
+    /// player's next update, which reads as the seek having failed.
+    fileprivate private(set) var pendingSeek: TimeInterval?
+
+    /// When that request went out, so an update that predates it is not mistaken for a reply.
+    private var seekSentAt: Date?
+
     public init(settings: WidgetSettings) throws {
         placement = try settings.enumeration("placement", default: .expanded)
         showsArtwork = try settings.bool("artwork", default: true)
@@ -72,6 +97,19 @@ public final class MediaWidget: NotchWidget {
 
     public func attach(attention: any NotchAttention) {
         self.attention = attention
+    }
+
+    public func setVisible(_ visible: Bool) {
+        if visible {
+            // Straight away, so the bar is already at the right place in the first frame rather
+            // than up to half a second stale.
+            now = Date()
+            startTicking()
+        } else {
+            ticker?.cancel()
+            ticker = nil
+            dragFraction = nil
+        }
     }
 
     public func activate() {
@@ -94,7 +132,37 @@ public final class MediaWidget: NotchWidget {
         }
     }
 
+    /// Advance `now` while playback does, so the scrubber moves between reports.
+    ///
+    /// Twice a second: the bar is a few hundred points wide against a track of a few minutes, so a
+    /// second is roughly a point, and half-second steps are already finer than the display can
+    /// show.
+    ///
+    /// Started from `setVisible` rather than `activate`, which is the whole reason that hook
+    /// exists. This widget stays active behind a closed notch to catch track changes, and a clock
+    /// tied to activation would tick there all day for a bar nobody is looking at.
+    private func startTicking() {
+        guard ticker == nil else { return }
+
+        ticker = Task { [weak self] in
+            while !Task.isCancelled {
+                if self?.playing?.isPlaying == true { self?.now = Date() }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+    }
+
     public func deactivate() {
+        // The ticker goes immediately, whatever the source does below: it exists to move something
+        // on screen, and there is no screen now.
+        ticker?.cancel()
+        ticker = nil
+        seekSettleTask?.cancel()
+        seekSettleTask = nil
+        dragFraction = nil
+        pendingSeek = nil
+        seekSentAt = nil
+
         // Deliberately keeps `playing` and `artwork`. Clearing them meant every reopen showed an
         // empty panel that then filled in piecemeal — the artwork arriving a beat after the text,
         // over a background that had already finished animating. Holding one downsampled thumbnail
@@ -155,9 +223,61 @@ public final class MediaWidget: NotchWidget {
         source?.send(command)
     }
 
+    /// Ask the player to jump to a fraction of the way along the track.
+    fileprivate func seek(toFraction fraction: Double) {
+        guard let target = playing?.seekTarget(fraction: fraction) else { return }
+
+        source?.seek(to: target)
+        pendingSeek = target
+        seekSentAt = Date()
+
+        // A player that ignores the request, or one that has gone away, must not leave the bar
+        // frozen at a position playback never reached.
+        seekSettleTask?.cancel()
+        seekSettleTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.forgetPendingSeek()
+        }
+    }
+
+    private func forgetPendingSeek() {
+        pendingSeek = nil
+        seekSentAt = nil
+        seekSettleTask?.cancel()
+        seekSettleTask = nil
+    }
+
+    /// What the scrubber should say, which is not always what the player last said.
+    ///
+    /// A drag outranks a pending seek, and a pending seek outranks the player: each is a more
+    /// recent statement of where playback is meant to be than the one below it.
+    fileprivate var displayedElapsed: TimeInterval? {
+        if let dragFraction, let target = playing?.seekTarget(fraction: dragFraction) {
+            return target
+        }
+        if let pendingSeek { return pendingSeek }
+        return playing?.elapsed(at: now)
+    }
+
+    /// How far along to draw the bar, 0...1, or nil when there is no length to be a fraction of.
+    fileprivate var displayedProgress: Double? {
+        guard let duration = playing?.duration, duration > 0, let elapsed = displayedElapsed else {
+            return nil
+        }
+        return min(1, max(0, elapsed / duration))
+    }
+
     private func apply(_ update: NowPlaying?) async {
         let previous = playing
         playing = update
+
+        // Hand the bar back to the player once it has answered. Updates already in flight when the
+        // seek went out still carry the old position, so anything that arrives immediately is not
+        // an answer — it is the question being overtaken.
+        if let sentAt = seekSentAt, Date().timeIntervalSince(sentAt) > 0.35 {
+            forgetPendingSeek()
+        }
 
         announceIfTrackChanged(from: previous, to: update)
 
@@ -188,13 +308,27 @@ private struct MediaWidgetView: View {
 
     var body: some View {
         if let playing = widget.playing, playing.isPresentable {
-            HStack(spacing: 12) {
-                if showsArtwork { artworkView }
-                details(for: playing)
-                Spacer(minLength: 0)
-                controls
+            // A band, then the bar under it. The artwork sets the band's height, so the text and
+            // the controls are free inside it — and the scrubber spanning the full width below
+            // gets a drag target the width of the panel rather than of whatever is left over.
+            //
+            // Nothing here is sized by its content: the text column is the remainder after the
+            // artwork and the controls, which are both fixed. A long title changes what the panel
+            // says and never where anything on it sits.
+            VStack(spacing: 6) {
+                HStack(spacing: 12) {
+                    if showsArtwork { artworkView }
+                    details(for: playing)
+                    Spacer(minLength: 8)
+                    controls
+                }
+
+                Scrubber(widget: widget)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 6)
+            // The content box starts 10pt below the camera housing and ends flush with the panel,
+            // which left the band sitting high in it. This is the matching gap at the bottom.
+            .padding(.bottom, 5)
         } else {
             Text("Nothing playing")
                 .font(.system(size: 12, weight: .medium))
@@ -222,45 +356,140 @@ private struct MediaWidgetView: View {
     private func details(for playing: NowPlaying) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(playing.title ?? "")
-                .accessibilityIdentifier("media.title")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .accessibilityIdentifier("media.title")
 
-            if let artist = playing.artist, !artist.isEmpty {
-                Text(artist)
-                    .accessibilityIdentifier("media.artist")
+            if let subtitle = subtitle(for: playing) {
+                Text(subtitle)
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .accessibilityIdentifier("media.artist")
             }
         }
+        // The column is the panel's remainder, claimed rather than requested: `Text` would
+        // otherwise ask for its full natural width and squeeze the controls off the right edge on
+        // exactly the long titles this is here to handle.
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Artist, then album if there is one — the system's own second line.
+    private func subtitle(for playing: NowPlaying) -> String? {
+        let parts = [playing.artist, playing.album]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " — ")
     }
 
     private var controls: some View {
-        HStack(spacing: 14) {
-            button("backward.fill", .previousTrack)
+        // Wider spacing than the buttons need, so the one in the middle is the one under the
+        // pointer. Mis-hitting `next` when reaching for `pause` costs you the track.
+        HStack(spacing: 18) {
+            button("backward.fill", .previousTrack, size: 14)
             button(
                 widget.playing?.isPlaying == true ? "pause.fill" : "play.fill",
-                .togglePlayPause
+                .togglePlayPause,
+                size: 18
             )
-            button("forward.fill", .nextTrack)
+            button("forward.fill", .nextTrack, size: 14)
         }
     }
 
-    private func button(_ symbol: String, _ command: MediaCommand) -> some View {
+    private func button(_ symbol: String, _ command: MediaCommand, size: CGFloat) -> some View {
         Button {
             widget.send(command)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 22, height: 22)
+                .font(.system(size: size))
+                .foregroundStyle(.white.opacity(0.9))
+                // The hit area is deliberately larger than the glyph: a 22pt target on a panel
+                // that closes when the pointer leaves it is a target you have to aim at.
+                .frame(width: 34, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         // Identifiers are how `make ui-probe` finds and presses these without touching a pixel.
         .accessibilityIdentifier(command.accessibilityIdentifier)
+    }
+}
+
+/// The progress bar, and the two ends of the track it is a progress through.
+///
+/// Draggable, so it is a control rather than a readout. Hidden entirely when the player reports no
+/// duration — live streams, and anything a browser is playing — because a bar with no end can only
+/// lie about where you are.
+private struct Scrubber: View {
+
+    let widget: MediaWidget
+
+    /// Height of the drawn bar.
+    ///
+    /// The gesture takes a taller slice than this; see `track`.
+    private let barHeight: CGFloat = 4
+
+    var body: some View {
+        if let progress = widget.displayedProgress, let duration = widget.playing?.duration {
+            // Times flank the bar rather than sitting under it. Underneath they read better, but
+            // they cost a whole row of a panel that has none to spare, and beside it they double
+            // as the bar's end stops.
+            HStack(spacing: 8) {
+                Text(TimeCode.text(widget.displayedElapsed ?? 0))
+                    .accessibilityIdentifier("media.elapsed")
+
+                track(progress: progress, duration: duration)
+
+                Text(TimeCode.text(duration))
+                    .accessibilityIdentifier("media.duration")
+            }
+            // Monospaced digits: without them the elapsed side re-lays out on every tick, and a
+            // number that changes width drags the bar's edge with it.
+            .font(.system(size: 10, weight: .medium).monospacedDigit())
+            .foregroundStyle(.white.opacity(0.45))
+        }
+    }
+
+    private func track(progress: Double, duration: TimeInterval) -> some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.white.opacity(0.18))
+                    .frame(height: barHeight)
+
+                Capsule()
+                    .fill(.white.opacity(0.85))
+                    .frame(width: max(barHeight, width * progress), height: barHeight)
+            }
+            .frame(height: proxy.size.height, alignment: .center)
+            // The whole slice takes the gesture, not just the 4pt bar: pointing at a 4pt target
+            // is a game, and the panel is not a game.
+            .contentShape(Rectangle())
+            .gesture(
+                // Zero minimum distance so a click seeks too, which is what a click on any other
+                // progress bar does.
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        widget.dragFraction = fraction(at: value.location.x, width: width)
+                    }
+                    .onEnded { value in
+                        let target = fraction(at: value.location.x, width: width)
+                        widget.dragFraction = nil
+                        widget.seek(toFraction: target)
+                    }
+            )
+        }
+        .frame(height: 14)
+        .accessibilityIdentifier("media.scrubber")
+    }
+
+    private func fraction(at x: CGFloat, width: CGFloat) -> Double {
+        guard width > 0 else { return 0 }
+        return min(1, max(0, Double(x / width)))
     }
 }
 

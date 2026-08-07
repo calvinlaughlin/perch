@@ -20,7 +20,53 @@ private final class SpyWidget: NotchWidget {
     private(set) var deactivations = 0
     var isRunning: Bool { activations > deactivations }
 
+    /// Every lifecycle call in order, so ordering between the two can be asserted and not assumed.
+    private(set) var events: [String] = []
+
+    /// Whether the host last said this widget was on screen.
+    private(set) var isVisible = false
+
     let placement: Placement
+
+    init(settings: WidgetSettings) throws {
+        placement = try settings.enumeration("placement", default: .expanded)
+    }
+
+    func activate() {
+        activations += 1
+        events.append("activate")
+    }
+
+    func deactivate() {
+        deactivations += 1
+        events.append("deactivate")
+    }
+
+    func setVisible(_ visible: Bool) {
+        isVisible = visible
+        events.append(visible ? "show" : "hide")
+    }
+
+    var body: AnyView { AnyView(EmptyView()) }
+}
+
+/// A widget that keeps working while hidden, the way media does.
+@MainActor
+private final class WatcherWidget: NotchWidget {
+    static let kind = "watcher"
+    static let settings: [WidgetSetting] = [
+        WidgetSetting(
+            name: "placement", syntax: "leading | trailing | expanded", defaultValue: "expanded",
+            documentation: "Where the widget draws.")
+    ]
+
+    private(set) var activations = 0
+    private(set) var deactivations = 0
+    var isRunning: Bool { activations > deactivations }
+    private(set) var isVisible = false
+
+    let placement: Placement
+    var runsWhileHidden: Bool { true }
 
     init(settings: WidgetSettings) throws {
         placement = try settings.enumeration("placement", default: .expanded)
@@ -28,6 +74,7 @@ private final class SpyWidget: NotchWidget {
 
     func activate() { activations += 1 }
     func deactivate() { deactivations += 1 }
+    func setVisible(_ visible: Bool) { isVisible = visible }
     var body: AnyView { AnyView(EmptyView()) }
 }
 
@@ -52,6 +99,10 @@ extension WidgetHost {
     @MainActor fileprivate var spy: SpyWidget? {
         widgets.compactMap { $0 as? SpyWidget }.first
     }
+
+    @MainActor fileprivate var watcher: WatcherWidget? {
+        widgets.compactMap { $0 as? WatcherWidget }.first
+    }
 }
 
 @MainActor
@@ -59,6 +110,7 @@ private func makeHost() -> (WidgetHost, WidgetRegistry) {
     let registry = WidgetRegistry()
     registry.register(SpyWidget.self)
     registry.register(BrokenWidget.self)
+    registry.register(WatcherWidget.self)
     return (WidgetHost(registry: registry), registry)
 }
 
@@ -172,6 +224,86 @@ struct WidgetLifecycleTests {
         host.setOnScreen(false)
 
         #expect(spy?.isRunning == false)
+    }
+
+    @Test("An expanded widget is on screen only while the panel is open")
+    func expandedVisibilityFollowsTheState() {
+        let (host, _) = makeHost()
+        host.apply(config: config("widget = spy"))
+        let spy = host.spy
+
+        #expect(spy?.isVisible == false)
+
+        host.notchStateChanged(to: .expanded)
+        #expect(spy?.isVisible == true)
+
+        // A peek draws `peekBody`, which is a different view — the expanded body is not on screen
+        // during one, and anything animating in it should stop.
+        host.notchStateChanged(to: .peek)
+        #expect(spy?.isVisible == false)
+
+        host.notchStateChanged(to: .collapsed)
+        #expect(spy?.isVisible == false)
+    }
+
+    @Test("A strip widget is on screen only while the notch is collapsed")
+    func stripVisibilityFollowsTheState() {
+        let (host, _) = makeHost()
+        host.apply(config: config("widget = spy\nspy-placement = leading"))
+        let spy = host.spy
+
+        #expect(spy?.isVisible == true)
+
+        // The strip is faded out when the panel opens. It keeps running — it is drawn again the
+        // moment the notch closes — but it is not being looked at.
+        host.notchStateChanged(to: .expanded)
+        #expect(spy?.isRunning == true)
+        #expect(spy?.isVisible == false)
+    }
+
+    @Test("Running while hidden is not the same as being on screen")
+    func hiddenRunnersAreNotVisible() {
+        // This is the whole reason the two ideas are separate. Media keeps watching behind a
+        // closed notch so it can announce a track change; a scrubber animating there would be a
+        // timer firing for a bar nobody can see.
+        let (host, _) = makeHost()
+        host.apply(config: config("widget = watcher"))
+        let watcher = host.watcher
+
+        #expect(watcher?.isRunning == true)
+        #expect(watcher?.isVisible == false)
+
+        host.notchStateChanged(to: .expanded)
+        #expect(watcher?.isVisible == true)
+
+        host.notchStateChanged(to: .collapsed)
+        #expect(watcher?.isRunning == true)
+        #expect(watcher?.isVisible == false)
+    }
+
+    @Test("A sleeping display hides everything, including what keeps running")
+    func sleepHidesEverything() {
+        let (host, _) = makeHost()
+        host.apply(config: config("widget = watcher"))
+        host.notchStateChanged(to: .expanded)
+
+        host.setOnScreen(false)
+
+        #expect(host.watcher?.isVisible == false)
+        #expect(host.watcher?.isRunning == false)
+    }
+
+    @Test("A widget is told it is hidden before it is stopped")
+    func hiddenBeforeStopped() {
+        // Order matters: a widget must never be told it is on screen while it is stopped, and
+        // `deactivate` is the last word.
+        let (host, _) = makeHost()
+        host.apply(config: config("widget = spy"))
+        host.notchStateChanged(to: .expanded)
+
+        host.notchStateChanged(to: .collapsed)
+
+        #expect(host.spy?.events == ["activate", "show", "hide", "deactivate"])
     }
 
     @Test("Reloading config stops the old widgets before building new ones")

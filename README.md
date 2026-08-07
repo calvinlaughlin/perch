@@ -19,8 +19,8 @@ the new one on its own, then revert.</sub>
 
 ## What it does
 
-- **Shows what is playing** — artwork, title, artist, transport controls, for any player macOS
-  knows about. Hover the notch and it opens.
+- **Shows what is playing** — artwork, title, artist, a scrubber you can drag to seek, and
+  transport controls, for any player macOS knows about. Hover the notch and it opens.
 - **Announces track changes** — the notch briefly swells to tell you what came on, then reverts.
 - **Stays out of the way** — collapsed, it traces the camera housing exactly and is invisible.
   Clicks pass straight through it. Nothing polls; it costs 0% CPU sitting there.
@@ -60,7 +60,7 @@ perch --edit-config          # or edit ~/.config/perch/config directly
 ```ini
 open-on         = hover      # hover | click | never
 open-delay      = 120ms
-expanded-height = 88
+expanded-height = 94
 
 widget          = media
 media-artwork   = true

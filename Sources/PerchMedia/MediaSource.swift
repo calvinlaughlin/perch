@@ -48,4 +48,10 @@ public protocol MediaSource: AnyObject, Sendable {
 
     /// Ask the current player to do something.
     func send(_ command: MediaCommand)
+
+    /// Ask the current player to jump to a position, in seconds from the start.
+    ///
+    /// Separate from `send` because it carries a value: the transport commands are an enum of
+    /// verbs, and folding a continuous argument into that enum would mean a case per position.
+    func seek(to position: TimeInterval)
 }

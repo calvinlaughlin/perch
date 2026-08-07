@@ -134,6 +134,39 @@ public final class MediaRemoteAdapterSource: MediaSource, @unchecked Sendable {
         }
     }
 
+    public func seek(to position: TimeInterval) {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        task.arguments =
+            [location.script.path, location.framework.path] + Self.seekArguments(position)
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+
+        do {
+            try task.run()
+        } catch {
+            Log.media.error("could not seek: \(error.localizedDescription)")
+        }
+    }
+
+    /// The adapter's spelling of a seek.
+    ///
+    /// Split out and tested because the unit is the trap: the adapter takes **microseconds** as a
+    /// positive integer, while every position perch handles elsewhere is seconds as a `Double`.
+    /// Passing seconds straight through is a seek to the first moment of the track that looks
+    /// almost right for the first few seconds of playback.
+    static func seekArguments(_ position: TimeInterval) -> [String] {
+        guard position.isFinite, position > 0 else { return ["seek", "0"] }
+
+        let microseconds = (position * 1_000_000).rounded()
+
+        // Compared, not `min`-ed. `Double(Int.max)` is not `Int.max`: it rounds *up* to 2^63,
+        // which is one past the largest `Int`, so clamping to it and converting traps on exactly
+        // the input the clamp was written to survive. Anything below 2^63 converts safely.
+        guard microseconds < Double(Int.max) else { return ["seek", String(Int.max)] }
+        return ["seek", String(Int(microseconds))]
+    }
+
     // MARK: - The subprocess
 
     /// Kill any adapter left behind by a previous perch.

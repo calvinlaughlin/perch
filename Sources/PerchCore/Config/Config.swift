@@ -66,8 +66,14 @@ public struct Config: Equatable, Sendable {
 
     /// Height of the expanded panel below the notch, in points.
     ///
-    /// Sized to hug one row of content. Raise it if a widget needs more room.
-    public var expandedHeight: CGFloat = 88
+    /// Sized for the media widget's band — artwork beside a column holding the track, its controls,
+    /// and the scrubber — because that is what perch shows out of the box. Six points more than
+    /// the scrubber-less panel it replaces: height is the expensive axis on a surface that hangs
+    /// off the notch and is already far wider than it is tall.
+    ///
+    /// Widgets share one height: the deck deals every card the same face, so this is the tallest
+    /// thing any of them needs rather than a per-widget measurement.
+    public var expandedHeight: CGFloat = 94
 
     /// Width of the expanded panel, in points.
     ///

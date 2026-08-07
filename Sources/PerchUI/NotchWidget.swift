@@ -93,10 +93,22 @@ public protocol NotchWidget: AnyObject {
     /// Optional: widgets that never announce anything can ignore it, which is why there is a
     /// default implementation that does nothing.
     func attach(attention: any NotchAttention)
+
+    /// Note that this widget's `body` is, or is no longer, on screen.
+    ///
+    /// Not the same question as `activate`. A widget with `runsWhileHidden` stays active behind a
+    /// closed notch precisely so it can keep watching — but *watching* is not *drawing*, and
+    /// anything that only exists to move pixels has no business running when there are no pixels:
+    /// an animation nobody can see costs exactly as much as one they can.
+    ///
+    /// Called with `false` before `deactivate`, so a widget that only implements the latter is
+    /// still correct. Default does nothing.
+    func setVisible(_ visible: Bool)
 }
 
 extension NotchWidget {
     public func attach(attention: any NotchAttention) {}
+    public func setVisible(_ visible: Bool) {}
     public var runsWhileHidden: Bool { false }
     public var peekBody: AnyView? { nil }
     public static var summary: String { "" }
