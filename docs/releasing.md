@@ -112,16 +112,27 @@ cask "perch" do
   sha256 "..."
   url "https://github.com/calvinlaughlin/perch/releases/download/v#{version}/perch-#{version}.zip"
   name "perch"
-  desc "Minimal, config-driven macOS notch app"
+  desc "Minimal, config-driven notch app"
   homepage "https://github.com/calvinlaughlin/perch"
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
   app "perch.app"
-  zap trash: [
-    "~/.config/perch",
-    "~/Library/Preferences/dev.perch.perch.plist",
-  ]
+  zap trash: "~/.config/perch"
 end
 ```
+
+`shasum -a 256 build/dist/perch-<version>.zip` gives the checksum, and `brew style Casks/perch.rb`
+checks the result.
+
+Two things in there are easy to get backwards:
+
+- **`depends_on macos: :sonoma` means Sonoma *or later*.** A bare symbol is a minimum in a cask —
+  `Cask::DSL::DependsOn#macos=` parses it with a `>=` comparator — even though the same symbol in a
+  *formula* means that version exactly. `brew info --cask` prints the resolved requirement
+  (`Required: macOS >= 14`) if you want to see it rather than trust it. The string form
+  `">= :sonoma"` reads as though it were the safer spelling; it is deprecated, and `brew style`
+  will tell you to replace it with the bare symbol.
+- **The description must not name the platform.** `brew style` rejects "macOS notch app" in `desc`,
+  since every cask is macOS.
 
 A cask can ship an un-notarised app, but every user then meets a Gatekeeper warning, so notarise
 first.
