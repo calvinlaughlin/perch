@@ -164,10 +164,13 @@ user opened themselves, and it reverts on its own after `peek-duration`.
 Peeks are for genuine changes, not for updates. The media widget peeks on a change of *track*, not
 on every playback update — announcing each one would be intolerable.
 
-Override `peekBody` to show something more compact during a peek; it defaults to `body`.
+`peekBody` is what your widget draws in one, and it is `nil` by default — a widget that has never
+announced anything has nothing to say in the two seconds a peek lasts, and appearing there
+regardless means someone else's track change hands the user your scratchpad. Override it only if
+you also call `requestPeek`, and return a compact form: a peek is glanced at, not read.
 
 ```swift
-var peekBody: AnyView { AnyView(Text(title).font(.system(size: 12))) }
+var peekBody: AnyView? { AnyView(Text(title).font(.system(size: 12))) }
 ```
 
 ## Testing

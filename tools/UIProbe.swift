@@ -617,8 +617,12 @@ scenario(
         open-on = never
         peek-duration = 2s
         widget = media
+        widget = notes
         """
 ) { app in
+    // Notes is configured deliberately. A peek is an announcement, and the panel's other widgets
+    // are beside the point for the two seconds it is up — a scratchpad arriving because the track
+    // changed is not an announcement of anything.
     // `open-on = never` is deliberate: it proves the peek was produced by the widget rather than
     // by the pointer happening to be somewhere.
     movePointer(to: parkingSpot)
@@ -643,10 +647,16 @@ scenario(
         // Poll tightly. Sampling only after a coarse detection loop misses the first moments,
         // which is exactly when a late-arriving image or metadata field rearranges things.
         var sawPeek = false
+        var sawScratchpad = false
         var frames: [(x: CGFloat, y: CGFloat, text: String)] = []
         for _ in 0..<200 {
             if let title = element(withIdentifier: "media.peek.title", in: app) {
                 sawPeek = true
+                // Sampled inside the peek rather than after it: the panel is only up for two
+                // seconds, and looking once it has gone proves nothing about what was in it.
+                if element(withIdentifier: "notes.container", in: app) != nil {
+                    sawScratchpad = true
+                }
                 if let bounds = screenFrame(of: title) {
                     frames.append((bounds.minX, bounds.minY, value(title) ?? ""))
                 }
@@ -657,6 +667,10 @@ scenario(
             wait(0.03)
         }
         check(sawPeek, "skipping a track makes the notch announce it")
+        check(
+            !sawScratchpad,
+            "the scratchpad stays out of the announcement"
+        )
 
         // An announcement that rearranges itself while you are reading it is worse than none.
         if sawPeek, frames.count >= 3 {
