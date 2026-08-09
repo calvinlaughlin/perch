@@ -20,7 +20,7 @@ public final class MediaWidget: NotchWidget {
             name: "artwork", syntax: "true | false", defaultValue: "true",
             documentation: "Show album art."),
         WidgetSetting(
-            name: "artwork-size", syntax: "points", defaultValue: "56",
+            name: "artwork-size", syntax: "points", defaultValue: "48",
             documentation: "Size of the album art."),
     ]
 
@@ -82,7 +82,7 @@ public final class MediaWidget: NotchWidget {
     public init(settings: WidgetSettings) throws {
         placement = try settings.enumeration("placement", default: .expanded)
         showsArtwork = try settings.bool("artwork", default: true)
-        artworkSize = try settings.length("artwork-size", default: 56)
+        artworkSize = try settings.length("artwork-size", default: PanelMetrics.artwork)
     }
 
     /// Media keeps working while hidden.
@@ -315,20 +315,17 @@ private struct MediaWidgetView: View {
             // Nothing here is sized by its content: the text column is the remainder after the
             // artwork and the controls, which are both fixed. A long title changes what the panel
             // says and never where anything on it sits.
-            VStack(spacing: 6) {
-                HStack(spacing: 12) {
+            VStack(spacing: PanelMetrics.rowGap) {
+                HStack(spacing: PanelMetrics.columnGap) {
                     if showsArtwork { artworkView }
                     details(for: playing)
-                    Spacer(minLength: 8)
+                    Spacer(minLength: PanelMetrics.columnGap)
                     controls
                 }
 
                 Scrubber(widget: widget)
             }
-            .padding(.horizontal, 6)
-            // The content box starts 10pt below the camera housing and ends flush with the panel,
-            // which left the band sitting high in it. This is the matching gap at the bottom.
-            .padding(.bottom, 5)
+
         } else {
             Text("Nothing playing")
                 .font(.system(size: 12, weight: .medium))
@@ -345,16 +342,19 @@ private struct MediaWidgetView: View {
             } else {
                 // A neutral placeholder rather than nothing, so the row does not resize the
                 // instant artwork finishes decoding.
-                RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.08))
+                RoundedRectangle(cornerRadius: PanelMetrics.artworkRadius)
+                    .fill(.white.opacity(0.08))
             }
         }
         .frame(width: artworkSize, height: artworkSize)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .clipShape(
+            RoundedRectangle(cornerRadius: PanelMetrics.artworkRadius, style: .continuous)
+        )
         .accessibilityIdentifier(widget.artwork == nil ? "media.artwork.missing" : "media.artwork")
     }
 
     private func details(for playing: NowPlaying) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: PanelMetrics.textGap) {
             Text(playing.title ?? "")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
@@ -388,7 +388,7 @@ private struct MediaWidgetView: View {
     private var controls: some View {
         // Wider spacing than the buttons need, so the one in the middle is the one under the
         // pointer. Mis-hitting `next` when reaching for `pause` costs you the track.
-        HStack(spacing: 18) {
+        HStack(spacing: PanelMetrics.controlGap) {
             button("backward.fill", .previousTrack, size: 14)
             button(
                 widget.playing?.isPlaying == true ? "pause.fill" : "play.fill",
@@ -408,7 +408,7 @@ private struct MediaWidgetView: View {
                 .foregroundStyle(.white.opacity(0.9))
                 // The hit area is deliberately larger than the glyph: a 22pt target on a panel
                 // that closes when the pointer leaves it is a target you have to aim at.
-                .frame(width: 34, height: 28)
+                .frame(width: PanelMetrics.control, height: PanelMetrics.control)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -429,14 +429,14 @@ private struct Scrubber: View {
     /// Height of the drawn bar.
     ///
     /// The gesture takes a taller slice than this; see `track`.
-    private let barHeight: CGFloat = 4
+    private let barHeight = PanelMetrics.bar
 
     var body: some View {
         if let progress = widget.displayedProgress, let duration = widget.playing?.duration {
             // Times flank the bar rather than sitting under it. Underneath they read better, but
             // they cost a whole row of a panel that has none to spare, and beside it they double
             // as the bar's end stops.
-            HStack(spacing: 8) {
+            HStack(spacing: PanelMetrics.rowGap) {
                 Text(TimeCode.text(widget.displayedElapsed ?? 0))
                     .accessibilityIdentifier("media.elapsed")
 
@@ -483,7 +483,7 @@ private struct Scrubber: View {
                     }
             )
         }
-        .frame(height: 14)
+        .frame(height: PanelMetrics.scrubberRow)
         .accessibilityIdentifier("media.scrubber")
     }
 
@@ -503,7 +503,7 @@ private struct MediaPeekView: View {
     var body: some View {
         let track = widget.peekSnapshot ?? widget.playing
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: PanelMetrics.columnGap) {
             if showsArtwork {
                 // The space is reserved whether or not the image has decoded yet. Showing nothing
                 // and then inserting it shoves the text sideways mid-announcement.
@@ -511,14 +511,16 @@ private struct MediaPeekView: View {
                     if let artwork = widget.artwork {
                         Image(nsImage: artwork).resizable()
                     } else {
-                        RoundedRectangle(cornerRadius: 5).fill(.white.opacity(0.08))
+                        RoundedRectangle(cornerRadius: PanelMetrics.unit * 1.5)
+                            .fill(.white.opacity(0.08))
                     }
                 }
                 .frame(width: artworkSize, height: artworkSize)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .clipShape(
+                    RoundedRectangle(cornerRadius: PanelMetrics.unit * 1.5, style: .continuous))
             }
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: PanelMetrics.textGap / 2) {
                 Text(track?.title ?? "")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
@@ -534,6 +536,5 @@ private struct MediaPeekView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 4)
     }
 }

@@ -80,8 +80,11 @@ private struct NotesWidgetView: View {
                 Text(placeholder)
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.35))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    // Offset from the editor's own padding by one unit in each direction, which
+                    // is what `NSTextView` insets its text by. Without that the placeholder and
+                    // the first character you type do not sit in the same place.
+                    .padding(.horizontal, PanelMetrics.unit * 3)
+                    .padding(.vertical, PanelMetrics.unit * 2)
                     .allowsHitTesting(false)
                     .accessibilityIdentifier("notes.placeholder")
             }
@@ -102,8 +105,8 @@ private struct NotesWidgetView: View {
         .foregroundStyle(.white.opacity(0.9))
         .tint(.white)
         .scrollContentBackground(.hidden)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(.horizontal, PanelMetrics.unit * 2)
+        .padding(.vertical, PanelMetrics.unit)
         .focused($isFocused)
         .accessibilityIdentifier("notes.editor")
     }

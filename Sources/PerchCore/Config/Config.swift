@@ -73,7 +73,7 @@ public struct Config: Equatable, Sendable {
     ///
     /// Widgets share one height: the deck deals every card the same face, so this is the tallest
     /// thing any of them needs rather than a per-widget measurement.
-    public var expandedHeight: CGFloat = 94
+    public var expandedHeight: CGFloat = 100
 
     /// Width of the expanded panel, in points.
     ///
