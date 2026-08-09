@@ -1,0 +1,105 @@
+name: Bump cask
+
+# Point the Homebrew cask at a release, the moment it is published.
+#
+# Here rather than in the release process because the checksum has to be of the asset **as
+# published**, not of the local zip the release was built from. Those are normally identical, and
+# when they are not, every `brew install` fails on a mismatch with nothing to explain it. A
+# workflow that only ever sees the published asset cannot make that mistake.
+#
+# Needs a fine-grained PAT with contents:write on the tap repository only, stored as TAP_TOKEN.
+# Without it this skips rather than fails: a repository without the secret should not have a red
+# cross on every release, and `make tap` still does the job locally.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to point the cask at, e.g. 0.2.0"
+        required: true
+
+jobs:
+  bump:
+    name: Update the Homebrew cask
+    runs-on: ubuntu-latest
+
+    env:
+      TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+      TAP_REPO: calvinlaughlin/homebrew-tap
+      CASK_PATH: Casks/perch.rb
+
+    steps:
+      - name: Check for the token
+        id: token
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::TAP_TOKEN is not set — skipping. Run 'make tap' locally instead."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Work out the version
+        if: steps.token.outputs.present == 'true'
+        id: version
+        run: |
+          raw="${{ github.event.inputs.version || github.event.release.tag_name }}"
+          echo "version=${raw#v}" >> "$GITHUB_OUTPUT"
+
+      # Downloaded from the public release URL, which is the same URL brew will use. Anything that
+      # would break a user's install — a missing asset, a wrong name — breaks here first.
+      - name: Fetch the published asset
+        if: steps.token.outputs.present == 'true'
+        id: asset
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          url="https://github.com/${{ github.repository }}/releases/download/v${version}/perch-${version}.zip"
+          echo "fetching $url"
+          code=$(curl -sL -w '%{http_code}' -o asset.zip "$url")
+          if [ "$code" != "200" ]; then
+            echo "::error::asset returned HTTP $code — is it attached to the release?"
+            exit 1
+          fi
+          echo "sha=$(sha256sum asset.zip | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the tap
+        if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.TAP_REPO }}
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: Update the cask
+        if: steps.token.outputs.present == 'true'
+        run: |
+          cask="tap/${CASK_PATH}"
+          version="${{ steps.version.outputs.version }}"
+          sha="${{ steps.asset.outputs.sha }}"
+
+          # Anchored to the stanza names, so a version string inside a URL or a comment is not
+          # rewritten along with the real one.
+          sed -i \
+            -e "s|^  version \".*\"|  version \"${version}\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"${sha}\"|" \
+            "$cask"
+
+          grep -q "version \"${version}\"" "$cask" || { echo "::error::version did not update"; exit 1; }
+          grep -q "sha256 \"${sha}\"" "$cask" || { echo "::error::sha256 did not update"; exit 1; }
+
+          cat "$cask"
+
+      - name: Commit and push
+        if: steps.token.outputs.present == 'true'
+        working-directory: tap
+        run: |
+          if git diff --quiet; then
+            echo "cask already at ${{ steps.version.outputs.version }} — nothing to do"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "perch ${{ steps.version.outputs.version }}"
+          git push

@@ -44,12 +44,31 @@ password never appears in the repo or in a command you would paste into an issue
 
 ## Cutting a release
 
+Say **`/release`** to a coding agent. That runs `.claude/skills/release/SKILL.md`, which is this
+document turned into a procedure: preflight, choose the version, bump, build, notarise, and then
+stop — once, with the notarised artefact and the draft notes in front of you — before tagging and
+publishing. Optionally `/release 0.3.0` to pin the version, or `/release patch`.
+
+It stops in exactly one place because that is the last moment nothing is public. Everything before
+it lives on your machine and in one commit; everything after is a tag, a release, and a cask other
+people install from.
+
+By hand, the same path:
+
 ```sh
-make release
+make release-preflight     # on main, clean, synced, CI green, credentials present, make check
+$EDITOR Makefile           # bump VERSION
+make release               # sign, notarise, staple, verify
+git tag -a v<version> -m "perch <version>" && git push origin v<version>
+gh release create v<version> build/dist/perch-<version>.zip --title "perch <version>" --notes "…"
 ```
 
-Which is: build → sign nested code then the bundle → zip → submit → wait → staple → re-zip →
-verify. The artefact is `build/dist/perch-<version>.zip`.
+**Run the preflight before touching `VERSION`.** A release that fails halfway is worse than one
+that never began: the version is already bumped, possibly pushed, and the repository disagrees with
+itself about what has been released.
+
+`make release` is: build → sign nested code then the bundle → zip → submit → wait → staple →
+re-zip → verify. The artefact is `build/dist/perch-<version>.zip`.
 
 Nested code is signed **before** the bundle. A signature covers what is inside it, so signing the
 app before its framework invalidates the app's own seal.
@@ -69,6 +88,35 @@ is the one users experience, so check both.
 
 A stapled ticket matters because without it Gatekeeper has to reach Apple to check — so a first
 launch on a machine that is offline fails.
+
+### What CI checks after a release
+
+Two workflows fire on `release: published`, and between them they check the things this machine
+cannot. It already trusts the signing certificate, already has perch in `/Applications`, and has
+run every intermediate build — so "it opens here" is compatible with a download nobody else can
+open.
+
+- **`bump-cask.yml`** points the Homebrew cask at the new release. It checksums the asset **as
+  published** rather than the local zip it was built from; those are normally identical, and when
+  they are not, every `brew install` fails on a mismatch with nothing to explain it.
+- **`release-smoke-test.yml`** waits for the cask, then installs it on a clean `macos-15` runner
+  and asserts the app is really there, that `spctl` reports `source=Notarized Developer ID`, and
+  that the ticket is stapled. Then it uninstalls.
+
+Neither can replace `make ui-probe` — no runner has a camera housing or an Accessibility grant.
+
+### One-time: the tap token
+
+`bump-cask.yml` needs to push to a different repository, so it needs a token of its own. Without
+one it **skips** rather than fails, and `make tap` does the same job locally.
+
+1. [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new)
+   — a fine-grained token, **only** the `homebrew-tap` repository, **Contents: read and write**.
+   Nothing else, so a leak cannot reach perch itself.
+2. `gh secret set TAP_TOKEN --repo calvinlaughlin/perch` and paste it.
+
+Check it took with `gh run list --workflow bump-cask.yml` after the next release: a skipped run
+logs a warning saying so.
 
 ## Installing a release locally
 

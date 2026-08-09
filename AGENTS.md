@@ -7,7 +7,9 @@ A file for [guiding coding agents](https://agents.md/).
 - **Build:** `make` · **Run:** `make run` · **Format:** `make fmt`
 - **Check:** `make check` — lint, arch guard, warnings-as-errors build, tests. What CI runs.
 - **Test one suite:** `swift test --filter <name>`
-- **Release:** `make release` — signs, notarises, staples
+- **Release:** `/release` — the whole path, stopping once before anything is public.
+  `make release-preflight` alone answers "could I release right now?"; `make release` signs,
+  notarises and staples; `make tap` points the Homebrew cask at a published release.
 
 Hardware probes, local only, needing a notched display and granted permissions:
 

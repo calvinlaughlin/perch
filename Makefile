@@ -19,7 +19,7 @@ CONTENTS   := $(APP)/Contents
 SWIFT_SOURCES := Sources Tests Package.swift
 
 .PHONY: all app adapter icon build run test check arch probe ui-probe fmt lint \
-        sign notarize release verify-release clean install uninstall
+        sign notarize release release-preflight verify-release tap clean install uninstall
 
 all: app
 
@@ -216,8 +216,24 @@ notarize: sign
 	@ditto -c -k --keepParent "$(APP)" "$(DIST_ZIP)"
 	@echo "notarised: $(DIST_ZIP)"
 
+## release-preflight — everything that must be true before a release starts.
+##
+## Run before touching VERSION. A release that fails halfway is worse than one that never began:
+## by then the version is bumped and possibly pushed, and the repository disagrees with itself
+## about what has been released.
+release-preflight:
+	@bash tools/release-preflight.sh
+
 ## release — the full path to something a stranger can download and open.
 release: notarize verify-release
+
+## tap — point the Homebrew cask at the published release of $(VERSION).
+##
+## Checksums the asset **as published** rather than the local zip it was built from. Those are
+## normally identical; when they are not, every `brew install` fails on a checksum mismatch with
+## nothing to explain it.
+tap:
+	@bash tools/update-tap.sh $(VERSION)
 
 ## verify-release — check the result the way Gatekeeper will.
 ##
