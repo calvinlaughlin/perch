@@ -50,14 +50,16 @@ struct NotchContentView: View {
     private var expandedContent: some View {
         let rect = model.layout.expandedRect
         let housingHeight = model.layout.hardwareRect.height
-        let inset: CGFloat = 10
+        let inset = PanelMetrics.panelInset
         let widgets = host.widgets(at: .expanded)
 
         return ExpandedDeck(model: model, widgets: widgets)
             .frame(
                 width: max(0, rect.width - inset * 2),
                 // Start below the housing: content drawn behind it is content nobody can see.
-                height: max(0, rect.height - housingHeight - inset)
+                // Inset at the bottom too, so a widget does not have to pad itself to look
+                // centred — the box it is handed is already symmetric.
+                height: max(0, rect.height - housingHeight - inset * 2)
             )
             .position(
                 x: rect.midX,
@@ -73,17 +75,17 @@ struct NotchContentView: View {
     private var peekContent: some View {
         let rect = model.layout.peekRect
         let housingHeight = model.layout.hardwareRect.height
-        let inset: CGFloat = 8
+        let inset = PanelMetrics.panelInset
         let announcements = host.widgets(at: .expanded).compactMap(\.peekBody)
 
-        return HStack(spacing: inset) {
+        return HStack(spacing: PanelMetrics.columnGap) {
             ForEach(Array(announcements.enumerated()), id: \.offset) { _, peek in
                 peek
             }
         }
         .frame(
             width: max(0, rect.width - inset * 2),
-            height: max(0, rect.height - housingHeight - inset)
+            height: max(0, rect.height - housingHeight - inset * 2)
         )
         // Biased slightly upward rather than centred. The shape's bottom corners are rounded, so
         // an optically centred row sits closer to the edge than it measures — a few points of
@@ -95,7 +97,10 @@ struct NotchContentView: View {
     }
 
     /// Extra breathing room beneath a peek's content.
-    private let peekBottomBias: CGFloat = 4
+    ///
+    /// One unit, and an optical correction rather than a spacing value: the shape's bottom corners
+    /// are rounded, so a row centred by measurement sits closer to the edge than it looks.
+    private let peekBottomBias = PanelMetrics.unit
 
     // MARK: - Collapsed
 
@@ -124,13 +129,13 @@ struct NotchContentView: View {
     }
 
     private func strip(_ widgets: [any NotchWidget], alignment: Alignment) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: PanelMetrics.rowGap) {
             ForEach(Array(widgets.enumerated()), id: \.offset) { _, widget in
                 widget.body
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, PanelMetrics.rowGap)
     }
 }
 
@@ -159,7 +164,7 @@ private struct ExpandedDeck: View {
     let widgets: [any NotchWidget]
 
     /// The gap between cards, so the one arriving is not mistaken for more of the one leaving.
-    private let gap: CGFloat = 10
+    private let gap = PanelMetrics.cardGap
 
     var body: some View {
         // Read out here, not inside the `GeometryReader`. Observation is established while the body

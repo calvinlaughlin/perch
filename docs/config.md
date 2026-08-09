@@ -181,7 +181,7 @@ connected falls back to `notched` rather than leaving perch invisible.
 
 | Key | Accepts | Default |
 |---|---|---|
-| `expanded-height` | points | `94` |
+| `expanded-height` | points | `100` |
 | `expanded-width` | points | `420` |
 | `corner-radius` | points | `24` |
 | `collapsed-corner-radius` | points | `14` |
@@ -243,7 +243,7 @@ Spotify, browsers, anything that registers with macOS.
 |---|---|---|
 | `media-placement` | `leading` \| `trailing` \| `expanded` | `expanded` |
 | `media-artwork` | `true` \| `false` | `true` |
-| `media-artwork-size` | points | `56` |
+| `media-artwork-size` | points | `48` |
 
 Album art is decoded off the main thread and downsampled to the size actually drawn, so a 3000px
 cover never becomes a 3000px bitmap.

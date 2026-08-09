@@ -60,7 +60,7 @@ perch --edit-config          # or edit ~/.config/perch/config directly
 ```ini
 open-on         = hover      # hover | click | never
 open-delay      = 120ms
-expanded-height = 94
+expanded-height = 100
 
 widget          = media
 media-artwork   = true

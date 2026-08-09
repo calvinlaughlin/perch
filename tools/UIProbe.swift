@@ -347,7 +347,10 @@ scenario(
     if let scrubber = element(withIdentifier: "media.scrubber", in: app),
         let bar = screenFrame(of: scrubber)
     {
-        check(bar.width > 300, "the scrubber spans the panel (\(Int(bar.width))pt)")
+        // The bar is the panel minus its margins, the two time labels, and the gaps either side
+        // of it. The labels widen by a few points past ten minutes and again past an hour, so this
+        // leaves room for the longest of them rather than asserting an exact width.
+        check(bar.width > 280, "the scrubber spans the panel (\(Int(bar.width))pt)")
         check(
             element(withIdentifier: "media.elapsed", in: app) != nil
                 && element(withIdentifier: "media.duration", in: app) != nil,
