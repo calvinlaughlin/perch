@@ -1,0 +1,82 @@
+name: Release smoke test
+
+# Install a published release the way a stranger would, on a machine that has never seen perch.
+#
+# The local checks a release is cut with cannot answer this. The machine that built it already
+# trusts the signing certificate, already has the app in /Applications, and has run every
+# intermediate build — so "it opens here" is compatible with a download nobody else can open. A
+# clean runner resolving the cask from the public tap is the closest thing to the real thing that
+# does not involve a real person.
+#
+# Runs after the cask bump, since it installs what the cask points at.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to test, e.g. 0.2.0. Defaults to whatever the cask points at."
+        required: false
+
+jobs:
+  install:
+    name: Install from the tap
+    runs-on: macos-15
+
+    steps:
+      # The bump workflow and this one both fire on `release: published`. Give the cask time to
+      # arrive rather than racing it and reporting a stale version as a failure.
+      - name: Wait for the cask to catch up
+        if: github.event_name == 'release'
+        env:
+          EXPECTED: ${{ github.event.release.tag_name }}
+        run: |
+          want="${EXPECTED#v}"
+          brew tap calvinlaughlin/tap
+          for attempt in $(seq 1 20); do
+            brew update --quiet >/dev/null 2>&1 || true
+            have=$(brew info --cask calvinlaughlin/tap/perch --json=v2 2>/dev/null \
+              | jq -r '.casks[0].version' 2>/dev/null || echo "")
+            echo "attempt $attempt: cask says '${have:-nothing}', want '$want'"
+            if [ "$have" = "$want" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "::error::the cask never reached $want — did bump-cask run?"
+          exit 1
+
+      - name: Install
+        run: |
+          brew tap calvinlaughlin/tap
+          brew install --cask perch
+
+      # An install that reports success while leaving nothing behind is a failure mode this has to
+      # be able to tell apart from a working one.
+      - name: The app is actually there
+        run: |
+          test -d /Applications/perch.app
+          test -x /Applications/perch.app/Contents/MacOS/perch
+          /Applications/perch.app/Contents/MacOS/perch --version
+
+      # The one that matters. `codesign --verify` says a signature is internally valid; `spctl`
+      # says whether this machine would let it run, which is the question a user actually asks by
+      # double-clicking. They can disagree — an un-notarised or unstapled build passes the first
+      # and fails the second.
+      - name: Gatekeeper accepts it
+        run: |
+          spctl --assess --type execute --verbose=4 /Applications/perch.app 2>&1 | tee assessment.txt
+          grep -q "source=Notarized Developer ID" assessment.txt || {
+            echo "::error::Gatekeeper did not accept this as a notarised Developer ID build"
+            exit 1
+          }
+
+      - name: The notarisation ticket is stapled
+        run: |
+          # Without a stapled ticket Gatekeeper has to reach Apple to check, so a first launch on
+          # an offline machine fails — and the runner is online, so nothing above would notice.
+          xcrun stapler validate /Applications/perch.app
+
+      - name: Uninstall cleanly
+        run: |
+          brew uninstall --cask perch
+          test ! -d /Applications/perch.app
