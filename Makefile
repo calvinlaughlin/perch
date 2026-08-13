@@ -5,7 +5,7 @@
 
 NAME       := perch
 BUNDLE_ID  := dev.perch.perch
-VERSION    := 0.3.0
+VERSION    := 0.3.1
 
 # `make CONFIG=debug` for faster iteration builds.
 CONFIG     ?= release
