@@ -45,21 +45,29 @@ their notch behaves differently.
 State the version and the one-line reason in your final report. Do not ask about it separately —
 it arrives at the single stop below with everything else.
 
-## 3. Bump and push
+## 3. Bump, via a pull request
 
-Edit `VERSION` in the `Makefile`. Commit **directly to main** and push — this is the one place the
-repo skips a PR, because it is a one-line change that `make check` has already covered:
+Edit `VERSION` in the `Makefile`. **main is protected** — it requires a pull request and a green
+`Check`, so the bump cannot be pushed directly however small it is. Trying is not a harmless
+mistake: the push is rejected after the commit exists, leaving a local main ahead of origin that
+the next preflight then refuses to release from.
 
 ```sh
+git checkout -b release-<version>
 git commit -am "Release <version>"
-git push origin main
+git push -u origin release-<version>
+gh pr create --title "Release <version>" --body "Version bump for <version>."
 ```
 
-Then wait for CI on main and **abort the release if it goes red**:
+Then wait for CI, and **abort the release if it goes red**:
 
 ```sh
-gh run watch $(gh run list --branch main --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
+gh pr checks <n> --watch --fail-fast
+gh pr merge <n> --squash --delete-branch
+git checkout main && git pull
 ```
+
+Nothing is public yet. A red build is a reason to stop, not to retry.
 
 ## 4. Build, sign, notarise
 
