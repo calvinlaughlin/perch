@@ -12,7 +12,7 @@ import SwiftUI
 final class ClockWidget: NotchWidget {
     static let kind = "clock"
 
-    // Shown in the starter config perch writes on first run.
+    // Shown by `perch +show-config --docs`, which is where widgets are discoverable.
     static let summary = "Shows the time."
     static let settings: [WidgetSetting] = [
         WidgetSetting(
@@ -58,8 +58,8 @@ Register it in `WidgetRegistry.registerBuiltIns()`:
 shared.register(ClockWidget.self)
 ```
 
-Registration lives there rather than in `AppDelegate` because `perch --edit-config` generates a
-starter config listing the available widgets, and it runs before the app starts.
+Registration lives there rather than in `AppDelegate` because `perch +show-config --docs` lists the
+available widgets, and it runs before the app starts.
 
 It is now reachable from config:
 

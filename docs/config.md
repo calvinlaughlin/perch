@@ -6,13 +6,17 @@ perch reads one plain-text file:
 $XDG_CONFIG_HOME/perch/config      # or ~/.config/perch/config
 ```
 
-`perch --config-path` prints the exact location. On first run perch writes an annotated starter
-config there listing every setting, every available widget, and what each accepts — so the file
-itself is the reference.
+`perch +config-path` prints the exact location. On first run perch writes a short file there —
+a few lines of comment and `widget = media`, nothing else.
 
-**Everything in it is commented out.** A file pinning today's values would freeze them: a later
-perch that improved a default would never reach anyone who had opened their config once.
-Uncommenting a line is how you say you disagree with a default.
+**It is deliberately almost empty.** An annotated dump of every setting reads as a form to be
+filled in, and a file listing today's values would freeze them: a later perch that improved a
+default would never reach anyone who had opened their config once. Adding a line is how you say
+you disagree with a default.
+
+The options live in `perch +show-config --default --docs` instead — see
+[Seeing the current settings](#seeing-the-current-settings). The file is what you keep; that is
+what you consult.
 
 **The file is optional.** The defaults are what perch is meant to look like; the file is for
 disagreeing with one of them, not a prerequisite for a working app. Changes apply the moment you
@@ -57,13 +61,28 @@ terminal and editors can jump straight to the line.
 ## Seeing the current settings
 
 ```sh
-perch --show-config          # every key and its active value
-perch --show-config --docs   # the same, with documentation
+perch +show-config                     # every key and its active value
+perch +show-config --docs              # the same, with documentation
+perch +show-config --default --docs    # the defaults instead, documented — the full reference
 ```
 
-The output is itself a valid config file — you can redirect it straight to
-`~/.config/perch/config` and start editing. It is generated from the same table the parser uses,
-so it cannot drift out of date with what perch actually does.
+`--default` ignores your file and prints what perch would do with no config at all, which is the
+question you have while writing one.
+
+The output covers the core keys *and* every registered widget, so it is where a setting like
+`media-artwork` or `notes-placeholder` is discoverable. A widget that is off has its lines
+commented out, so the output stays loadable as written.
+
+It is itself a valid config file, and reloading it gives the same config back — including the
+order widgets are drawn in. It is generated from the same table the parser uses, so it cannot
+drift out of date with what perch actually does.
+
+To start a file from it, write via a temporary path rather than redirecting onto the config
+directly — the shell truncates the target before perch reads it:
+
+```sh
+perch +show-config --default > /tmp/perch.config && mv /tmp/perch.config ~/.config/perch/config
+```
 
 ## Keys
 

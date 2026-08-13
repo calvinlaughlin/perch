@@ -42,8 +42,11 @@ needs to keep working while invisible opts in explicitly via `runsWhileHidden`, 
 that its idle cost is negligible — measure before making it.
 
 **The config struct is the schema.** Each stored property on `Config` is a key, its declared value
-is the default, and its doc comment is the documentation. `--show-config --docs` is generated from
-the same table the parser uses, so it cannot drift, and its output is a valid config file.
+is the default, and its doc comment is the documentation. `+show-config --docs` is generated from
+the same table the parser uses, so it cannot drift, and its output is a valid config file. Since
+the file perch writes is nearly empty, that generated output is also the only reference there is —
+which is why it documents the registered widgets too, passed down from `PerchUI` as
+`WidgetDocumentation` so `PerchCore` still need not know widgets exist.
 
 ## AppKit traps this app is built on top of
 

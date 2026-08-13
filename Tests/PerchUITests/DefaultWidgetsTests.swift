@@ -42,12 +42,13 @@ struct DefaultWidgetsTests {
         #expect(diagnostics.isEmpty)
     }
 
-    @Test("The starter config offers notes as something to turn on")
-    func starterConfigOffersNotes() {
-        let text = ConfigTemplate.starter(registry: registry())
+    @Test("The reference offers notes as something to turn on")
+    func referenceOffersNotes() {
+        // Opt-in is only fair if it is discoverable. That used to be the generated config file's
+        // job; now the file is a few lines long and `+show-config --docs` is the one place perch
+        // volunteers the list, so this is what has to keep working.
+        let text = ConfigTemplate.reference(includeDocs: true, registry: registry())
 
-        // Opt-in is only fair if it is discoverable, and the generated file is where someone finds
-        // out notes exists at all — it is the one place perch volunteers the list.
         #expect(text.contains("#widget = notes"))
         #expect(!text.contains("\nwidget = notes"))
         #expect(text.contains("\nwidget = media"))

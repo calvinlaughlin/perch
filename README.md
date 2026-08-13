@@ -55,7 +55,7 @@ clone builds with `make` and nothing else.
 ## Configure
 
 ```sh
-perch --edit-config          # or edit ~/.config/perch/config directly
+perch +edit-config           # or edit ~/.config/perch/config directly
 ```
 
 ```ini
@@ -73,8 +73,10 @@ Saved changes apply immediately. A typo is reported and skipped rather than taki
 ~/.config/perch/config:12: warning: unknown key 'expanded-heigth' — did you mean 'expanded-height'?
 ```
 
-`perch --show-config --docs` prints every key with documentation, and its output is itself a valid
-config file. Full reference: **[docs/config.md](docs/config.md)**.
+The file perch writes is a few lines long — the defaults are the product, and the file is for
+disagreeing with one of them. `perch +show-config --default --docs` prints every key and every
+widget with documentation, and its output is itself a valid config file. Full reference:
+**[docs/config.md](docs/config.md)**.
 
 ## Widgets
 

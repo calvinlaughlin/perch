@@ -15,9 +15,9 @@ public enum Placement: String, Equatable, Sendable, CaseIterable {
 
 /// One documented setting a widget accepts.
 ///
-/// Lets a widget describe its own options so the starter config can list them. Without this the
-/// only way to discover `media-artwork` would be to read the source, which rather defeats a
-/// config file whose whole premise is that it explains itself.
+/// Lets a widget describe its own options so `+show-config --docs` can list them. Without this the
+/// only way to discover `media-artwork` would be to read the source — and since the config file
+/// perch writes is deliberately almost empty, that generated output is the only place to find it.
 public struct WidgetSetting: Equatable, Sendable {
     /// The name after the widget's prefix: `artwork` in `media-artwork`.
     public let name: String
@@ -36,6 +36,37 @@ public struct WidgetSetting: Equatable, Sendable {
         self.syntax = syntax
         self.defaultValue = defaultValue
         self.documentation = documentation
+    }
+}
+
+/// One widget, described well enough to document it.
+///
+/// `PerchCore` has no idea widgets exist — the registry that knows them lives in `PerchUI`. This
+/// carries just enough across that boundary for `+show-config --docs` to list widget settings
+/// beside the core keys, without `PerchCore` gaining a dependency on either the registry or
+/// SwiftUI. `PerchUI` builds these from the registry and hands them down.
+///
+/// It matters that this exists at all: once the config file perch writes is a few lines long, the
+/// generated reference is the *only* place a widget setting is discoverable.
+public struct WidgetDocumentation: Equatable, Sendable {
+
+    /// The name used in `widget = media`.
+    public let kind: String
+
+    /// One line saying what the widget is.
+    public let summary: String
+
+    /// The settings it accepts, unprefixed.
+    public let settings: [WidgetSetting]
+
+    /// Whether perch enables it without being asked.
+    public let isDefault: Bool
+
+    public init(kind: String, summary: String, settings: [WidgetSetting], isDefault: Bool) {
+        self.kind = kind
+        self.summary = summary
+        self.settings = settings
+        self.isDefault = isDefault
     }
 }
 
