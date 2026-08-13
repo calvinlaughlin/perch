@@ -328,11 +328,58 @@ func window(of app: AXUIElement) -> AXUIElement? {
 }
 
 /// Whether the notch is currently showing its expanded contents.
+///
+/// `expanded.deck` first, and a widget's own identifiers only as a fallback. The deck publishes one
+/// node per slot, so an open panel fills the tree with them and a widget's controls can sit past
+/// `descendants`' limit — which reads as a closed panel when the panel is plainly open. The deck is
+/// also there whatever the widget has to say, where `media.*` disappears entirely when no player
+/// has reported a track yet.
 func panelIsOpen(_ app: AXUIElement) -> Bool {
-    descendants(of: app).contains { identifier($0)?.hasPrefix("media.") == true }
+    descendants(of: app).contains { element in
+        guard let identifier = identifier(element) else { return false }
+        return identifier == "expanded.deck" || identifier.hasPrefix("media.")
+    }
 }
 
 // MARK: - Scenarios
+
+/// A point in the empty space the open panel would occupy, well clear of the collapsed shape.
+///
+/// Nothing is drawn here while the notch is shut, so nothing here may open it. The panel is 420
+/// wide against a housing of about 185, so a point 150 to the left of centre and below the housing
+/// is inside the panel's region and outside the notch by a wide margin.
+let belowTheNotch = CGPoint(
+    x: housingCentre - 150,
+    y: screen.safeAreaInsets.top + 25
+)
+
+scenario(
+    "hover only opens from the notch itself",
+    interaction: .driving,
+    config: """
+        open-on = hover
+        widget = media
+        """
+) { app in
+    // The regression this exists for: the media widget's artwork is a button, and SwiftUI gives
+    // every `.onHover` a tracking area of its own. The content stays in the view tree while the
+    // panel is shut — drawn at zero opacity so reopening is instant — so those areas sit over
+    // empty screen. Entry events from them once opened the notch from 25pt below it, which reads
+    // as the notch flying open before you get there.
+    check(!panelIsOpen(app), "the panel starts closed")
+
+    movePointer(to: belowTheNotch)
+    wait(2.0)
+    check(!panelIsOpen(app), "hovering the panel's empty region does not open the notch")
+
+    // The other half, so the check above cannot pass by simply never opening: the same pointer,
+    // moved onto the notch, must still open it.
+    movePointer(to: onTheNotch)
+    wait(1.5)
+    check(panelIsOpen(app), "hovering the notch itself still opens it")
+
+    movePointer(to: parkingSpot)
+}
 
 scenario(
     "media widget",

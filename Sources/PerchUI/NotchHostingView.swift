@@ -75,6 +75,14 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func mouseEntered(with event: NSEvent) {
+        // Ours is not the only tracking area in this view. SwiftUI installs one of its own for
+        // every `.onHover` in the content, and the content is *always* in the tree — a collapsed
+        // panel is drawn at zero opacity rather than removed, so reopening is instant. Those areas
+        // therefore cover the panel's whole region while there is visibly nothing there, and an
+        // unguarded entry opens the notch from empty space below it, before the pointer has
+        // arrived. Check where the pointer actually is, the way `mouseExited` already does.
+        let local = convert(event.locationInWindow, from: nil)
+        guard interactiveRect.contains(layoutPoint(fromViewPoint: local)) else { return }
         onPointerEntered?()
     }
 
