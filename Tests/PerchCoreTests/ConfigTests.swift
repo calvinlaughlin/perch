@@ -280,6 +280,68 @@ struct ConfigSchemaTests {
         #expect(result.config == Config())
     }
 
+    /// Two widgets: one perch would enable by default, one it would not.
+    private static let widgetDocs = [
+        WidgetDocumentation(
+            kind: "media",
+            summary: "Shows the current track.",
+            settings: [
+                WidgetSetting(
+                    name: "artwork", syntax: "true | false", defaultValue: "true",
+                    documentation: "Show album art.")
+            ],
+            isDefault: true
+        ),
+        WidgetDocumentation(
+            kind: "clock",
+            summary: "Shows the time.",
+            settings: [
+                WidgetSetting(
+                    name: "24-hour", syntax: "true | false", defaultValue: "false",
+                    documentation: "Use a 24-hour clock.")
+            ],
+            isDefault: false
+        ),
+    ]
+
+    @Test("Widget settings round-trip through the generated reference")
+    func widgetOutputRoundTrips() {
+        // The config file perch writes no longer lists widgets, so this output is the only place
+        // they are documented. If it does not parse back, the reference is lying.
+        var config = Config()
+        config.widgets = ["media"]
+        config.widgetSettings["media"] = ["artwork": "false"]
+
+        let text = ConfigSchema.show(config, includeDocs: true, widgets: Self.widgetDocs)
+        let result = ConfigLoader.load(source: text)
+
+        #expect(result.diagnostics.isEmpty, "\(result.diagnostics.map(\.description))")
+        #expect(result.config == config)
+    }
+
+    @Test("A widget that is off has its settings commented out")
+    func disabledWidgetSettingsAreCommented() {
+        // A live `clock-24-hour` with no `widget = clock` above it is a warning, not a setting —
+        // so printing it uncommented would make the output a file perch complains about.
+        let text = ConfigSchema.show(Config(), includeDocs: true, widgets: Self.widgetDocs)
+
+        #expect(text.contains("#clock-24-hour = false"))
+        #expect(!text.contains("\nclock-24-hour"))
+    }
+
+    @Test("Enabled widgets are printed in the order they are drawn")
+    func widgetOrderIsPreserved() {
+        // Widgets draw in declaration order, so emitting them in registry order would round-trip
+        // to a different layout than the one that was asked for.
+        var config = Config()
+        config.widgets = ["clock", "media"]
+
+        let result = ConfigLoader.load(
+            source: ConfigSchema.show(config, widgets: Self.widgetDocs))
+
+        #expect(result.config.widgets == ["clock", "media"])
+    }
+
     @Test("A non-default config round-trips through its written form")
     func modifiedConfigRoundTrips() {
         var config = Config()

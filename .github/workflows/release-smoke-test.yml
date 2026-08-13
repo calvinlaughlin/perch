@@ -58,6 +58,18 @@ jobs:
           test -x /Applications/perch.app/Contents/MacOS/perch
           /Applications/perch.app/Contents/MacOS/perch --version
 
+      # The config file perch writes names `perch +show-config --default --docs` and nothing else,
+      # so a cask that installs the app but links no command leaves every option undiscoverable.
+      # That shipped once already; asking the question here is what stops it shipping again.
+      - name: The CLI is on PATH
+        run: |
+          command -v perch || {
+            echo "::error::the cask installed no perch command — is the binary stanza missing?"
+            exit 1
+          }
+          perch +show-config --default --docs | grep -q "^open-on = hover"
+          perch +show-config --default --docs | grep -q "^#widget = clock"
+
       # The one that matters. `codesign --verify` says a signature is internally valid; `spctl`
       # says whether this machine would let it run, which is the question a user actually asks by
       # double-clicking. They can disagree — an un-notarised or unstapled build passes the first

@@ -27,13 +27,13 @@ public enum ConfigPaths {
             .appendingPathComponent(".config/perch", isDirectory: true)
     }
 
-    /// Create the config file if it does not exist, seeded with documented defaults.
+    /// Create the config file if it does not exist, seeded with a short starter.
     ///
-    /// Opening an empty file teaches nothing. Seeding it with the generated defaults means the
-    /// first thing anyone sees is every option, documented, already in the syntax they need.
-    /// - Parameter contents: what to seed a missing file with. Supplied by the caller because a
-    ///   useful starter config lists the registered widgets, and `PerchCore` does not know widgets
-    ///   exist.
+    /// Opening a genuinely empty file teaches nothing, but neither does a wall of commented-out
+    /// settings — it reads as a form to fill in. The starter is a few lines that say the defaults
+    /// are fine and name the command that lists every option.
+    /// - Parameter contents: what to seed a missing file with. Supplied by the caller because it
+    ///   is built in `PerchUI`, alongside the reference that documents the registered widgets.
     /// - Returns: the config file's location, whether it already existed or was just created.
     @discardableResult
     public static func ensureConfigFileExists(contents: @autoclosure () -> String) -> URL {

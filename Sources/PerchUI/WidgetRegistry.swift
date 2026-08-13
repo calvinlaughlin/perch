@@ -18,9 +18,9 @@ public final class WidgetRegistry {
 
     /// Register every widget perch ships with.
     ///
-    /// Called before command-line handling as well as at launch: `--edit-config` generates a
-    /// starter config listing the available widgets, and it runs before the app does. Registering
-    /// only in `applicationDidFinishLaunching` left that list silently empty.
+    /// Called before command-line handling as well as at launch: `+show-config --docs` lists the
+    /// available widgets, and it runs before the app does. Registering only in
+    /// `applicationDidFinishLaunching` left that list silently empty.
     public static func registerBuiltIns() {
         shared.register(MediaWidget.self)
         shared.register(ClockWidget.self)

@@ -13,7 +13,7 @@ public struct ConfigKey: Sendable {
     /// What values are accepted, shown in help — `hover | click | never`, `points`, `duration`.
     public let syntax: String
 
-    /// One-line explanation, shown by `perch --show-config --docs`.
+    /// One-line explanation, shown by `perch +show-config --docs`.
     public let documentation: String
 
     /// Set this key on a config, or throw a `ConfigValueError` explaining why the value is no good.
@@ -210,9 +210,26 @@ public enum ConfigSchema {
 
     /// Render a config the way a file would spell it, optionally with the documentation.
     ///
-    /// This is what `perch --show-config` prints. Because it is generated from the same table the
-    /// parser uses, it doubles as a reference that cannot go stale.
-    public static func show(_ config: Config = Config(), includeDocs: Bool = false) -> String {
+    /// This is what `perch +show-config` prints. Because it is generated from the same table the
+    /// parser uses, it doubles as a reference that cannot go stale — and since the config perch
+    /// writes on first run is deliberately almost empty, this is where every option is documented.
+    ///
+    /// The output is itself a valid config file that reproduces `config`. That is why a widget
+    /// that is not enabled has its settings commented out: a bare `clock-24-hour` with no
+    /// `widget = clock` above it is a warning, not a setting, so printing it live would make the
+    /// output a file perch itself would complain about.
+    ///
+    /// - Parameters:
+    ///   - config: the config to render.
+    ///   - includeDocs: whether to precede each key with its documentation.
+    ///   - widgets: the registered widgets to document, supplied by `PerchUI`. Empty here prints
+    ///     core keys only, which is all `PerchCore` can know about on its own.
+    /// - Returns: the config as file text, loadable back into an equal `Config`.
+    public static func show(
+        _ config: Config = Config(),
+        includeDocs: Bool = false,
+        widgets: [WidgetDocumentation] = []
+    ) -> String {
         var lines: [String] = []
         for key in keys {
             if includeDocs {
@@ -224,6 +241,57 @@ public enum ConfigSchema {
             }
             lines.append("\(key.name) = \(key.describe(config))")
         }
+
+        // Enabled widgets first, in the order the config lists them, because that is the order
+        // they are drawn in — printing them in registry order would round-trip to a different
+        // layout. Disabled ones follow, in registry order, as a menu of what else exists.
+        let enabledFirst =
+            config.widgets.compactMap { kind in widgets.first { $0.kind == kind } }
+            + widgets.filter { !config.widgets.contains($0.kind) }
+
+        // `widget = <kind>` adds to the default list rather than replacing it, so printing the
+        // enabled ones alone would reproduce this config plus whatever perch defaults to. The
+        // empty `widget =` resets the list first, making the output say exactly what it means —
+        // and keeping it correct if the default list changes in a later version.
+        //
+        // Only when every enabled widget is documented here: if the caller passed a partial
+        // registry, clearing the list would drop the ones it did not describe.
+        let canResetList =
+            !widgets.isEmpty
+            && config.widgets.allSatisfy { kind in
+                widgets.contains { $0.kind == kind }
+            }
+        if canResetList {
+            lines.append("")
+            lines.append("widget =")
+        }
+
+        for widget in enabledFirst {
+            let enabled = config.widgets.contains(widget.kind)
+            // A disabled widget's lines are commented so the output stays loadable; an enabled
+            // one's are live so re-loading the output gives the config back unchanged.
+            let prefix = enabled ? "" : "#"
+
+            lines.append("")
+            if includeDocs {
+                lines.append("# \(widget.kind) — \(widget.summary)")
+            }
+            lines.append("\(prefix)widget = \(widget.kind)")
+
+            let settings = config.settings(for: widget.kind)
+            for setting in widget.settings {
+                if includeDocs {
+                    lines.append("#")
+                    for line in wrap(setting.documentation, width: 90) {
+                        lines.append("#   \(line)")
+                    }
+                    lines.append("#   accepts: \(setting.syntax)")
+                }
+                let value = settings.string(setting.name, default: setting.defaultValue)
+                lines.append("\(prefix)\(widget.kind)-\(setting.name) = \(value)")
+            }
+        }
+
         return lines.joined(separator: "\n")
     }
 

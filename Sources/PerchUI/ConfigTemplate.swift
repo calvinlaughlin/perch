@@ -1,106 +1,73 @@
 import Foundation
 import PerchCore
 
-/// Builds the annotated config file perch writes on first run.
+/// Builds the config file perch writes on first run, and the full reference behind it.
 ///
-/// **Everything is commented out.** A file that pinned every key at today's value would freeze
-/// those values forever — a later perch that improves a default would never reach anyone who had
-/// opened their config once. Commented lines document without pinning, so uncommenting is an
-/// explicit "I disagree with this default" rather than an accident.
+/// **The written file is nearly empty.** An annotated dump of every setting reads as a form to be
+/// filled in: it is long, most of it is irrelevant to any one person, and a file that listed
+/// today's values would date badly. A short file says the honest thing instead — the defaults are
+/// the product, and this file is for disagreeing with one of them.
 ///
-/// Lives in `PerchUI` rather than `PerchCore` because it lists the *registered* widgets and their
-/// settings, and `PerchCore` has no idea widgets exist.
+/// That only works if the options are discoverable somewhere else, which is what ``reference``
+/// is for. The two are not duplicates: the file is what you keep, the reference is what you
+/// consult.
+///
+/// Lives in `PerchUI` rather than `PerchCore` because ``reference`` lists the *registered* widgets
+/// and their settings, and `PerchCore` has no idea widgets exist.
 @MainActor
 public enum ConfigTemplate {
 
-    public static func starter(registry: WidgetRegistry = .shared) -> String {
-        var out: [String] = [
-            "# perch configuration",
-            "#",
-            "# Everything here is optional and everything is commented out, showing the default.",
-            "# Uncomment a line to change it. Leaving one commented means you keep whatever perch's",
-            "# default becomes in later versions, which is usually what you want.",
-            "#",
-            "# Saved changes apply immediately — no restart. A mistake is reported and skipped",
-            "# rather than taken to heart, so a typo will not leave you without a notch.",
-            "#",
-            "# Full reference:  perch --show-config --docs",
-        ]
+    /// The file written to `~/.config/perch/config` when there isn't one.
+    ///
+    /// Only `widget = media` is live. Everything else is absent rather than commented, so a later
+    /// perch that improves a default reaches anyone who never edited the file — which, given how
+    /// short it now is, is most people.
+    ///
+    /// Takes no registry: the widgets are no longer listed here, only in ``reference``.
+    public static func starter() -> String {
+        """
+        # This is the configuration file for perch.
+        #
+        # Empty is fine. perch ships with defaults meant to be left alone, and anything you do not
+        # set here follows them — including improvements to them in later versions. Add only what
+        # you want to be different.
+        #
+        # Saved changes apply immediately; there is no restart and no reload command. A line perch
+        # cannot make sense of is reported and skipped rather than taken to heart, so a typo will
+        # not leave you without a notch.
+        #
+        # For every option, what it accepts, and its default:
+        #
+        #     perch +show-config --default --docs
 
+        widget = media
+        """ + "\n"
+    }
+
+    /// Every core key and every registered widget, with documentation.
+    ///
+    /// This is what `perch +show-config` prints. The core keys come from `ConfigSchema`, which
+    /// generates them from the same table the parser uses; this adds the widgets, which only
+    /// `PerchUI` knows about.
+    public static func reference(
+        _ config: Config = Config(),
+        includeDocs: Bool = false,
+        registry: WidgetRegistry = .shared
+    ) -> String {
+        ConfigSchema.show(config, includeDocs: includeDocs, widgets: documentation(registry))
+    }
+
+    /// Describe the registered widgets for `PerchCore`, which cannot ask the registry itself.
+    private static func documentation(_ registry: WidgetRegistry) -> [WidgetDocumentation] {
         let defaults = Config()
-
-        // Core keys, grouped, in schema order within each group.
-        var seen = Set<String>()
-        let order = ConfigSchema.keys.map(\.section).filter { seen.insert($0).inserted }
-
-        for section in order {
-            out.append("")
-            out.append(heading(section))
-
-            for key in ConfigSchema.keys where key.section == section {
-                out.append("")
-                for line in wrap(key.documentation, width: 92) { out.append("# \(line)") }
-                out.append("# accepts: \(key.syntax)")
-                out.append("#\(key.name) = \(key.describe(defaults))")
-            }
+        return registry.kinds.compactMap { kind in
+            guard let description = registry.describe(kind) else { return nil }
+            return WidgetDocumentation(
+                kind: kind,
+                summary: description.summary,
+                settings: description.settings,
+                isDefault: defaults.widgets.contains(kind)
+            )
         }
-
-        // Widgets. The enabled ones are live rather than commented — a notch showing nothing is
-        // not a useful first impression, and this is what perch does by default anyway.
-        out.append("")
-        out.append(heading("Widgets"))
-        out.append("")
-        for line in wrap(
-            """
-            Declared with a repeated key, drawn in the order listed. `widget =` with no value \
-            clears the list. Each widget's settings are prefixed with its name.
-            """, width: 92)
-        {
-            out.append("# \(line)")
-        }
-
-        for kind in registry.kinds {
-            guard let description = registry.describe(kind) else { continue }
-            let isDefault = defaults.widgets.contains(kind)
-
-            out.append("")
-            out.append("# \(kind) — \(description.summary)")
-            if !isDefault {
-                out.append("# Not enabled by default; uncomment to turn it on.")
-            }
-            out.append(isDefault ? "widget = \(kind)" : "#widget = \(kind)")
-
-            for setting in description.settings {
-                out.append("#")
-                for line in wrap(setting.documentation, width: 90) { out.append("#   \(line)") }
-                out.append("#   accepts: \(setting.syntax)")
-                out.append("#\(kind)-\(setting.name) = \(setting.defaultValue)")
-            }
-        }
-
-        return out.joined(separator: "\n") + "\n"
-    }
-
-    private static func heading(_ title: String) -> String {
-        let rule = String(repeating: "─", count: max(0, 76 - title.count))
-        return "# ── \(title) \(rule)"
-    }
-
-    /// Greedy word wrap, so the generated file stays readable in a narrow editor.
-    private static func wrap(_ text: String, width: Int) -> [String] {
-        var lines: [String] = []
-        var current = ""
-        for word in text.split(separator: " ") {
-            if current.isEmpty {
-                current = String(word)
-            } else if current.count + 1 + word.count <= width {
-                current += " \(word)"
-            } else {
-                lines.append(current)
-                current = String(word)
-            }
-        }
-        if !current.isEmpty { lines.append(current) }
-        return lines
     }
 }

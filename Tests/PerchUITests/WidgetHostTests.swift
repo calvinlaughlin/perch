@@ -355,35 +355,55 @@ struct ConfigTemplateTests {
     func generatedConfigIsValid() {
         // It is the first thing a new user sees. A starter config that produced warnings would be
         // a poor introduction to a tool whose whole premise is an editable text file.
-        let result = ConfigLoader.load(source: ConfigTemplate.starter(registry: registry()))
+        let result = ConfigLoader.load(source: ConfigTemplate.starter())
 
         #expect(result.diagnostics.isEmpty, "\(result.diagnostics.map(\.description))")
     }
 
     @Test("The generated config changes nothing")
     func generatedConfigMatchesDefaults() {
-        // Everything is commented out on purpose: a file pinning today's values would freeze them,
-        // so a later perch that improves a default would never reach anyone who opened their
-        // config once. Only the widget list is live.
-        let result = ConfigLoader.load(source: ConfigTemplate.starter(registry: registry()))
+        // Nothing is pinned on purpose: a file listing today's values would freeze them, so a
+        // later perch that improves a default would never reach anyone who opened their config
+        // once. Only the widget list is live.
+        let result = ConfigLoader.load(source: ConfigTemplate.starter())
 
-        var expected = Config()
-        expected.widgets = Config().widgets  // the one thing the template writes uncommented
-        #expect(result.config == expected)
+        #expect(result.config == Config())
     }
 
-    @Test("Every core key appears, so nothing is undiscoverable")
-    func everyKeyIsListed() {
-        let text = ConfigTemplate.starter(registry: registry())
+    @Test("The starter config stays short")
+    func starterConfigIsMinimal() {
+        // The whole point of the change: the file is a note, not a form. Dumping every key back
+        // into it is the regression this guards against, so assert on both the length and the
+        // absence of the keys themselves.
+        let text = ConfigTemplate.starter()
 
+        #expect(
+            text.split(separator: "\n").count < 20,
+            "the starter config has grown a settings dump")
         for key in ConfigSchema.keys {
-            #expect(text.contains("#\(key.name) = "), "\(key.name) missing from the starter config")
+            #expect(!text.contains("\(key.name) ="), "\(key.name) is pinned in the starter config")
         }
     }
 
-    @Test("Registered widgets and their settings are listed")
+    @Test("The starter config says where the options are")
+    func starterConfigPointsAtTheReference() {
+        // A short file is only defensible if it hands you the long one. Losing this line would
+        // make every setting undiscoverable without reading the source.
+        #expect(ConfigTemplate.starter().contains("perch +show-config --default --docs"))
+    }
+
+    @Test("Every core key appears in the reference, so nothing is undiscoverable")
+    func everyKeyIsListed() {
+        let text = ConfigTemplate.reference(includeDocs: true, registry: registry())
+
+        for key in ConfigSchema.keys {
+            #expect(text.contains("\(key.name) = "), "\(key.name) missing from the reference")
+        }
+    }
+
+    @Test("Registered widgets and their settings are listed in the reference")
     func widgetsAreDocumented() {
-        let text = ConfigTemplate.starter(registry: registry())
+        let text = ConfigTemplate.reference(includeDocs: true, registry: registry())
 
         #expect(text.contains("spy —"))
         for setting in SpyWidget.settings {
@@ -391,12 +411,27 @@ struct ConfigTemplateTests {
         }
     }
 
-    @Test("A widget that is not on by default is commented out")
+    @Test("A widget that is not on by default is commented out of the reference")
     func inactiveWidgetsAreCommented() {
-        let text = ConfigTemplate.starter(registry: registry())
+        let text = ConfigTemplate.reference(registry: registry())
 
-        // `spy` is not in Config().widgets, so enabling it must require an edit.
+        // `spy` is not in Config().widgets, so enabling it must require an edit — and its settings
+        // must stay commented too, or the output stops being a loadable config file.
         #expect(text.contains("#widget = spy"))
         #expect(!text.contains("\nwidget = spy"))
+        for setting in SpyWidget.settings {
+            #expect(!text.contains("\nspy-\(setting.name)"), "spy-\(setting.name) is live")
+        }
+    }
+
+    @Test("The reference is itself a valid config that changes nothing")
+    func referenceRoundTrips() {
+        // Same contract `+show-config` has always had: the output is a config file, not prose
+        // about one. Now that it carries the widgets too, they have to hold up their end.
+        let result = ConfigLoader.load(
+            source: ConfigTemplate.reference(includeDocs: true, registry: registry()))
+
+        #expect(result.diagnostics.isEmpty, "\(result.diagnostics.map(\.description))")
+        #expect(result.config == Config())
     }
 }

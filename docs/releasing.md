@@ -164,6 +164,7 @@ cask "perch" do
   homepage "https://github.com/calvinlaughlin/perch"
   depends_on macos: :sonoma
   app "perch.app"
+  binary "#{appdir}/perch.app/Contents/MacOS/perch"
   zap trash: "~/.config/perch"
 end
 ```
@@ -171,7 +172,13 @@ end
 `shasum -a 256 build/dist/perch-<version>.zip` gives the checksum, and `brew style Casks/perch.rb`
 checks the result.
 
-Two things in there are easy to get backwards:
+Three things in there are easy to get wrong:
+
+- **`binary` is not optional.** The app bundle's executable *is* the CLI — there is no second
+  target — but a cask with only an `app` stanza installs no `perch` command, and the config file
+  perch writes tells people to run `perch +show-config --default --docs`. Without this line that
+  instruction is a dead end for everyone who installed via brew.
+
 
 - **`depends_on macos: :sonoma` means Sonoma *or later*.** A bare symbol is a minimum in a cask —
   `Cask::DSL::DependsOn#macos=` parses it with a `>=` comparator — even though the same symbol in a

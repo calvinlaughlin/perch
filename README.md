@@ -49,13 +49,20 @@ open -a perch
 
 Right-click the notch for configuration, **Open at Login**, and quit.
 
+The `perch` command is the app bundle's own executable. Homebrew puts it on your `PATH`; the other
+two routes do not, so add it if you want to use the CLI:
+
+```sh
+export PATH="/Applications/perch.app/Contents/MacOS:$PATH"
+```
+
 Requires **macOS 14+** and **Xcode 26 / Swift 6.2** to build. No `.xcodeproj` is committed — a
 clone builds with `make` and nothing else.
 
 ## Configure
 
 ```sh
-perch --edit-config          # or edit ~/.config/perch/config directly
+perch +edit-config           # or edit ~/.config/perch/config directly
 ```
 
 ```ini
@@ -73,8 +80,10 @@ Saved changes apply immediately. A typo is reported and skipped rather than taki
 ~/.config/perch/config:12: warning: unknown key 'expanded-heigth' — did you mean 'expanded-height'?
 ```
 
-`perch --show-config --docs` prints every key with documentation, and its output is itself a valid
-config file. Full reference: **[docs/config.md](docs/config.md)**.
+The file perch writes is a few lines long — the defaults are the product, and the file is for
+disagreeing with one of them. `perch +show-config --default --docs` prints every key and every
+widget with documentation, and its output is itself a valid config file. Full reference:
+**[docs/config.md](docs/config.md)**.
 
 ## Widgets
 
