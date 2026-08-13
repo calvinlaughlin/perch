@@ -24,7 +24,11 @@ import SwiftUI
 @MainActor
 public protocol NotchAttention: AnyObject, Sendable {
     /// Ask the notch to peek. Ignored if the user already has it open.
-    func requestPeek()
+    ///
+    /// - Parameter widget: the one with something to say. A peek shows this widget's `peekBody`,
+    ///   whatever its `placement` — an announcement is made by somebody, and a widget that lives in
+    ///   the collapsed strip still needs a way to say more than a strip is wide enough to hold.
+    func requestPeek(from widget: any NotchWidget)
 }
 
 @MainActor

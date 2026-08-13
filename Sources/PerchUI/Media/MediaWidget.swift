@@ -227,7 +227,7 @@ public final class MediaWidget: NotchWidget {
         // and announcing it on every start would be obnoxious.
         guard !isFirstTrackSeen, previous != nil else { return }
         peekSnapshot = current
-        attention?.requestPeek()
+        attention?.requestPeek(from: self)
     }
 
     fileprivate func send(_ command: MediaCommand) {

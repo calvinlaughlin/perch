@@ -320,6 +320,61 @@ The note is a plain `notes.txt` beside your config, written a moment after you s
 than on every keystroke, and re-read each time the panel opens — so editing the file in a real
 editor works, and does not lose whatever the panel had. Only `expanded` is a meaningful placement;
 the collapsed strip has no room to type.
+### claude
+
+Shows running Claude Code sessions as a row of dots, and announces when one stops. Defaults to the
+collapsed strip, so a glance at the bezel tells you whether anything is still working.
+
+| Key | Accepts | Default |
+|---|---|---|
+| `claude-placement` | `leading` \| `trailing` \| `expanded` | `trailing` |
+| `claude-announce` | `all` \| `finished` \| `waiting` \| `never` | `all` |
+| `claude-idle` | `true` \| `false` | `true` |
+| `claude-limit` | count | `5` |
+
+```ini
+collapsed-bleed  = 90
+widget           = claude
+claude-placement = trailing
+```
+
+A dot per live session. Filled means working; an amber dot inside a ring means the session has
+stopped and is waiting on you — a permission prompt, a dialog, an answer it asked for. An outline
+means it is sitting at the prompt with nothing to do. The dots do not animate, deliberately: a
+pulse would read well and would also repaint the notch continuously for as long as anything was
+running, which is the one thing perch promises not to do. Set `claude-idle = false` to hide
+finished sessions, and `claude-limit` to decide how many dots are drawn before the rest collapse
+into a `+n`.
+
+Two things make the notch announce, and `claude-announce` picks which: a session **finishing** —
+going from working to idle, the "it's done" case — and a session **blocking on you**. The
+announcement names the session and, for a finish, the directory it was working in. Like every
+peek, it reverts on its own and never interrupts a panel you opened yourself.
+
+Announcements are also subject to `peek-on-track-change`, which despite its name is the global
+switch for whether anything is allowed to announce. Turning it off silences this widget too.
+
+Nothing is announced from the first observation after perch starts or the display wakes. Otherwise
+opening the lid would replay every session that finished while the screen was off, which is a queue
+of news about work that is long over.
+
+#### A note on how this works
+
+Claude Code keeps a directory of live sessions at `~/.claude/sessions`, one JSON file per session
+named after its process id, holding the session's name, working directory, and current status. It
+rewrites that file whenever any of them change. perch watches the directory with `kqueue` and reads
+it — no hooks to install, nothing to configure on the Claude Code side, and no polling: the kernel
+wakes perch when a file changes and it costs nothing in between. `$CLAUDE_CONFIG_DIR` is honoured
+if you have moved the directory.
+
+A session file outlives a session that crashed or was killed, so perch checks the process is still
+alive before drawing anything for it.
+
+That directory is private to Claude Code rather than a published interface, and it can change shape
+without warning. perch treats it accordingly: a file it cannot understand is skipped rather than
+reported, and a status this build has never heard of is drawn as an unrecognised session rather
+than guessed at — in particular it never counts as finishing, so a future rename cannot produce
+announcements for sessions that have not done anything.
 
 ## Only one perch
 

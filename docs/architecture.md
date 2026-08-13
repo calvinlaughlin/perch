@@ -1,11 +1,12 @@
 # Architecture
 
-Four modules, dependencies pointing one direction.
+Five modules, dependencies pointing one direction.
 
 | Module | Role |
 |---|---|
 | `PerchCore` | Pure logic — geometry, config, state machine. No AppKit or SwiftUI. |
 | `PerchMedia` | Now-playing state, behind a `MediaSource` protocol. |
+| `PerchAgents` | Running coding-agent sessions, behind an `AgentSessionSource` protocol. |
 | `PerchUI` | The panel, the shape, widgets, SwiftUI views. |
 | `Perch` | Entry point and wiring. |
 

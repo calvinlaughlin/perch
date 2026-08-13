@@ -78,14 +78,24 @@ config file. Full reference: **[docs/config.md](docs/config.md)**.
 
 ## Widgets
 
-Three ship today — `media`, `clock`, and `notes`. Only `media` is on by default; the rest are a
-line of config away. A widget is one file: it declares a name, parses its own settings, says where
-it draws, and starts and stops its own work. Adding one needs no change to the config schema.
+Four ship today — `media`, `claude`, `clock`, and `notes`. Only `media` is on by default; the rest
+are a line of config away. A widget is one file: it declares a name, parses its own settings, says
+where it draws, and starts and stops its own work. Adding one needs no change to the config schema.
 
 ```ini
 collapsed-bleed = 90         # make room beside the housing
 widget          = clock
 clock-placement = trailing
+```
+
+`claude` shows running [Claude Code](https://claude.com/claude-code) sessions as a row of dots and
+makes the notch announce when one finishes or gets blocked waiting on you. It reads the session
+files Claude Code already keeps, so there is nothing to install on that side.
+
+```ini
+collapsed-bleed  = 90
+widget           = claude
+claude-placement = trailing
 ```
 
 See **[docs/writing-a-widget.md](docs/writing-a-widget.md)**.

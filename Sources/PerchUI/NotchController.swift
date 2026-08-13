@@ -207,8 +207,13 @@ public final class NotchController: NotchAttention {
     ///
     /// Timing lives here rather than in the state machine, which stays pure and synchronous so
     /// every transition can be tested without waiting on a clock.
-    public func requestPeek() {
+    public func requestPeek(from widget: any NotchWidget) {
         guard config.peekOnTrackChange else { return }
+
+        // Recorded before the event, because the state change it causes is what makes the view read
+        // back which widget is announcing. Setting it afterwards draws one frame of the wrong
+        // content — or of nothing at all, for a widget that is not in the expanded panel.
+        host.setAnnouncing(widget)
 
         deliver(.peekRequested)
         peekExpiryTask?.cancel()
@@ -218,6 +223,7 @@ public final class NotchController: NotchAttention {
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
             self?.deliver(.peekExpired)
+            self?.host.setAnnouncing(nil)
         }
     }
 

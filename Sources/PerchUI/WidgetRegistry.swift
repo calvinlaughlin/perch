@@ -24,6 +24,7 @@ public final class WidgetRegistry {
     public static func registerBuiltIns() {
         shared.register(MediaWidget.self)
         shared.register(ClockWidget.self)
+        shared.register(ClaudeWidget.self)
         shared.register(NotesWidget.self)
     }
 

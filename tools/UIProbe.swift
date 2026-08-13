@@ -259,6 +259,7 @@ enum Interaction {
 
 func scenario(
     _ name: String, interaction: Interaction = .passive, config: String,
+    environment extraEnvironment: [String: String] = [:],
     _ body: (AXUIElement) -> Void
 ) {
     if case .driving = interaction, !drivesInput {
@@ -287,6 +288,7 @@ func scenario(
     perch.standardError = FileHandle.nullDevice
     var environment = ProcessInfo.processInfo.environment
     environment["XDG_CONFIG_HOME"] = home.path
+    for (key, value) in extraEnvironment { environment[key] = value }
     perch.environment = environment
 
     do { try perch.run() } catch {
@@ -883,6 +885,153 @@ scenario(
 ) { app in
     // A config naming a widget that does not exist must not take the app down with it.
     check(descendants(of: app).contains { role($0) == "AXWindow" }, "perch still runs")
+}
+
+// MARK: - Claude sessions
+
+/// A throwaway `~/.claude` whose session files this probe writes itself.
+///
+/// The real directory is not used, and could not be: the whole point is to make a session change
+/// state on cue, which means owning the files. `CLAUDE_CONFIG_DIR` is the same override Claude Code
+/// honours, so perch resolves the fake directory by exactly the path it uses for the real one.
+final class FakeSessions {
+    let home: URL
+    let sessions: URL
+
+    /// A process that exists purely so its pid is a live one perch will believe in.
+    private var holders: [Process] = []
+
+    init() {
+        home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("perch-claude-\(UUID().uuidString)", isDirectory: true)
+        sessions = home.appendingPathComponent("sessions", isDirectory: true)
+        try? FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+    }
+
+    /// Start a real process and return its pid.
+    func liveProcess() -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        process.arguments = ["120"]
+        try? process.run()
+        holders.append(process)
+        return process.processIdentifier
+    }
+
+    /// A pid that is certainly not running, because it ran and was reaped.
+    func deadPid() -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try? process.run()
+        let pid = process.processIdentifier
+        process.waitUntilExit()
+        return pid
+    }
+
+    /// Write a session file the way Claude Code does — over the top, same inode.
+    ///
+    /// Not an atomic replace. A rename would bump the directory and let a watcher that only
+    /// watches the directory pass this scenario, which is the bug being probed for.
+    func write(pid: Int32, status: String, name: String) {
+        let json = """
+            {"pid":\(pid),"name":"\(name)","cwd":"/tmp/\(name)","kind":"interactive",\
+            "status":"\(status)","startedAt":\(1_785_385_517_232 + Int(pid))}
+            """
+        let file = sessions.appendingPathComponent("\(pid).json")
+
+        if let handle = try? FileHandle(forWritingTo: file) {
+            try? handle.truncate(atOffset: 0)
+            try? handle.write(contentsOf: Data(json.utf8))
+            try? handle.close()
+        } else {
+            try? Data(json.utf8).write(to: file)
+        }
+    }
+
+    deinit {
+        for holder in holders where holder.isRunning { holder.terminate() }
+        try? FileManager.default.removeItem(at: home)
+    }
+}
+
+let fake = FakeSessions()
+let alpha = fake.liveProcess()
+let beta = fake.liveProcess()
+let ghost = fake.deadPid()
+
+fake.write(pid: alpha, status: "busy", name: "alpha")
+fake.write(pid: beta, status: "idle", name: "beta")
+fake.write(pid: ghost, status: "busy", name: "ghost")
+
+scenario(
+    "claude sessions",
+    config: """
+        open-on = hover
+        collapsed-bleed = 90
+        peek-duration = 4s
+        widget = claude
+        claude-placement = trailing
+        """,
+    environment: ["CLAUDE_CONFIG_DIR": fake.home.path]
+) { app in
+    func dots() -> [String] {
+        descendants(of: app).compactMap {
+            guard let identifier = identifier($0), identifier.hasPrefix("claude.dot.") else {
+                return nil
+            }
+            return String(identifier.dropFirst("claude.dot.".count))
+        }
+    }
+
+    check(descendants(of: app).contains { role($0) == "AXWindow" }, "a window exists")
+
+    let initial = dots()
+    check(
+        initial.sorted() == ["busy", "idle"],
+        "the collapsed strip draws one dot per live session (got \(initial))"
+    )
+    check(
+        initial.count == 2,
+        "the session left behind by a dead process is not drawn (got \(initial.count) dots)"
+    )
+
+    // The transition this whole feature exists for, written the way Claude Code writes it.
+    fake.write(pid: alpha, status: "idle", name: "alpha")
+    wait(1.5)
+
+    let label = element(withIdentifier: "claude.peek.label", in: app)
+    check(label != nil, "a session finishing makes the notch peek")
+    check(
+        (label.flatMap(value) ?? "") == "alpha",
+        "the peek names the session that finished (got \(label.flatMap(value) ?? "nothing"))"
+    )
+
+    // The peek must revert on its own, without anybody touching the pointer.
+    wait(4.5)
+    check(
+        element(withIdentifier: "claude.peek.label", in: app) == nil,
+        "the peek reverts on its own"
+    )
+
+    let after = dots()
+    check(after.sorted() == ["idle", "idle"], "the strip now shows both sessions done (got \(after))")
+
+    // A session blocking on input is the other half of the announcement.
+    fake.write(pid: beta, status: "waiting", name: "beta")
+    wait(1.5)
+
+    check(
+        element(withIdentifier: "claude.peek.label", in: app).flatMap(value) == "beta",
+        "a session blocking on you also peeks"
+    )
+    wait(4.5)
+    check(dots().contains("waiting"), "a blocked session keeps its own dot (got \(dots()))")
+
+    // A session ending removes it, rather than leaving a dot nothing will ever update.
+    try? FileManager.default.removeItem(
+        at: fake.sessions.appendingPathComponent("\(alpha).json"))
+    wait(1.5)
+    check(dots().count == 1, "a session ending drops its dot (got \(dots()))")
 }
 
 // MARK: - Verdict

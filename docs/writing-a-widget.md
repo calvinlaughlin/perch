@@ -155,11 +155,15 @@ func attach(attention: any NotchAttention) {
 and ask when something worth announcing happens:
 
 ```swift
-attention?.requestPeek()
+attention?.requestPeek(from: self)
 ```
 
 Whether the request is honoured is not the widget's decision: a peek never interrupts a panel the
 user opened themselves, and it reverts on its own after `peek-duration`.
+
+Passing `self` is what lets the notch show *your* `peekBody`, whatever your `placement`. A widget
+that lives in the collapsed strip has room for a dot and not much else, so being able to say more
+than a strip is wide enough to hold is the point of announcing at all.
 
 Peeks are for genuine changes, not for updates. The media widget peeks on a change of *track*, not
 on every playback update — announcing each one would be intolerable.

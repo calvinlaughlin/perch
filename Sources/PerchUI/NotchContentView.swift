@@ -76,11 +76,10 @@ struct NotchContentView: View {
         let rect = model.layout.peekRect
         let housingHeight = model.layout.hardwareRect.height
         let inset = PanelMetrics.panelInset
-        let announcements = host.widgets(at: .expanded).compactMap(\.peekBody)
 
         return HStack(spacing: PanelMetrics.columnGap) {
-            ForEach(Array(announcements.enumerated()), id: \.offset) { _, peek in
-                peek
+            ForEach(Array(host.announcementWidgets.enumerated()), id: \.offset) { _, widget in
+                widget.peekBody
             }
         }
         .frame(

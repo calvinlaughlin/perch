@@ -36,8 +36,20 @@ public final class WidgetHost {
 
     private weak var attention: (any NotchAttention)?
 
+    /// The widget whose announcement is on screen, while one is.
+    ///
+    /// Weak because the widgets are owned by `widgets`, and a config reload replaces that array
+    /// mid-peek. Holding this strongly would keep a widget that no longer exists alive — and still
+    /// drawn — until the peek expired.
+    public private(set) weak var announcing: (any NotchWidget)?
+
     public init(registry: WidgetRegistry = .shared) {
         self.registry = registry
+    }
+
+    /// Note which widget is currently announcing something, or `nil` when nothing is.
+    public func setAnnouncing(_ widget: (any NotchWidget)?) {
+        announcing = widget
     }
 
     /// Rebuild every widget from a config.
@@ -85,6 +97,17 @@ public final class WidgetHost {
     /// The widgets drawn in a given position, in config order.
     public func widgets(at placement: Placement) -> [any NotchWidget] {
         widgets.filter { $0.placement == placement }
+    }
+
+    /// The widgets drawn during a peek.
+    ///
+    /// Just the one that asked, when perch knows which that was. A peek is one widget saying one
+    /// thing, and it lasts about two seconds — showing the rest of the panel alongside it makes the
+    /// announcement compete with things nobody asked about. Falls back to the expanded widgets so a
+    /// peek triggered by anything else still has something to draw.
+    public var announcementWidgets: [any NotchWidget] {
+        if let announcing { return [announcing] }
+        return widgets(at: .expanded)
     }
 
     // MARK: - Lifecycle
