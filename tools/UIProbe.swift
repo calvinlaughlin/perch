@@ -183,6 +183,27 @@ func playbackIsPlaying() -> Bool? {
     return playing
 }
 
+/// Which app the system says the audio belongs to.
+///
+/// Ground truth for the artwork link: perch's own idea of the player is what put the button there
+/// in the first place, so checking the click against it would only prove perch agrees with itself.
+func playbackBundleIdentifier() -> String? {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+    task.arguments = [adapterScript.path, adapterFramework.path, "get"]
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    task.standardError = FileHandle.nullDevice
+    guard (try? task.run()) != nil else { return nil }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    task.waitUntilExit()
+
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return nil
+    }
+    return object["bundleIdentifier"] as? String
+}
+
 /// Where the player says it has reached, and how long the track is.
 ///
 /// Ground truth for a seek, from the same place `playbackIsPlaying` gets it. perch's own scrubber
@@ -425,6 +446,37 @@ scenario(
         }
     } else {
         check(false, "could not locate the play/pause control or read playback state")
+    }
+
+    // The artwork is a door to the player, and the only evidence it opened is which app the system
+    // says is in front afterwards. perch cannot be asked that about itself, and a button that
+    // highlights on hover looks identical whether or not the click reaches Launch Services.
+    if let artwork = element(withIdentifier: "media.artwork", in: app),
+        let bounds = screenFrame(of: artwork),
+        let player = playbackBundleIdentifier()
+    {
+        check(
+            role(artwork) == "AXButton",
+            "the artwork is a control, not a picture (role is \(role(artwork)))"
+        )
+
+        // Whatever the user was in before the probe took the machine, so it can be given back.
+        let wasFrontmost = NSWorkspace.shared.frontmostApplication
+
+        click(at: CGPoint(x: bounds.midX, y: bounds.midY))
+        wait(2.0)
+
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        check(
+            front == player,
+            "clicking the artwork brings the player forward "
+                + "(wanted \(player), front is \(front ?? "nothing"))"
+        )
+
+        wasFrontmost?.activate()
+        wait(1.0)
+    } else {
+        check(false, "could not locate the artwork or read which app is playing")
     }
 
     movePointer(to: parkingSpot)
