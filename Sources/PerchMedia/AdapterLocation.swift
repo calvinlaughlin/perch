@@ -1,4 +1,5 @@
 import Foundation
+import PerchCore
 
 /// Where the vendored adapter's two pieces live.
 ///
@@ -20,9 +21,13 @@ public struct AdapterLocation: Equatable, Sendable {
 
     /// Find the adapter, preferring the copy inside the running app bundle.
     ///
+    /// Defaults to ``Bundle/running`` rather than `Bundle.main`: launched through the symlink the
+    /// Homebrew cask puts on `PATH`, `Bundle.main` is `/opt/homebrew/bin` and has no `Resources`,
+    /// so this would fall through to the development search, fail, and leave media unavailable.
+    ///
     /// - Parameter bundle: the bundle to search; defaults to the running app.
     /// - Returns: the location, or nil if either piece is missing.
-    public static func locate(in bundle: Bundle = .main) -> AdapterLocation? {
+    public static func locate(in bundle: Bundle = .running) -> AdapterLocation? {
         if let script = bundle.url(forResource: "mediaremote-adapter", withExtension: "pl"),
             let frameworks = bundle.privateFrameworksURL
         {

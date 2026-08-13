@@ -75,6 +75,19 @@ jobs:
           perch +show-config --default --docs | grep -q "^open-on = hover"
           perch +show-config --default --docs | grep -q "^#widget = clock"
 
+          # Through the symlink, not the bundle path. Everything perch reads out of its own bundle
+          # is reached via `Bundle.main`, which is derived from the path it was launched by — so
+          # via Homebrew's link it used to resolve to /opt/homebrew/bin, report its version as
+          # "dev", and fail to find the media adapter at all. The version is the cheap end of that:
+          # it is the same lookup, so it going wrong means the adapter is about to.
+          cask=$(brew info --cask calvinlaughlin/tap/perch --json=v2 | jq -r '.casks[0].version')
+          reported=$(perch --version | awk '{print $2}')
+          echo "cask says $cask, the linked command reports $reported"
+          if [ "$reported" != "$cask" ]; then
+            echo "::error::perch --version reports '$reported' via the symlink, expected '$cask'"
+            exit 1
+          fi
+
       # The one that matters. `codesign --verify` says a signature is internally valid; `spctl`
       # says whether this machine would let it run, which is the question a user actually asks by
       # double-clicking. They can disagree — an un-notarised or unstapled build passes the first
