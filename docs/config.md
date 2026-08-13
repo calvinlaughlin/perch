@@ -58,6 +58,22 @@ staring at a broken notch every time you typed a character in the wrong place.
 Diagnostics go to stderr in `path:line: severity: message` form, so `make run` shows them in the
 terminal and editors can jump straight to the line.
 
+## The `perch` command
+
+The app bundle's executable is also the CLI — there is no separate binary. `brew install --cask
+perch` puts it on your `PATH`. If you installed by copying the app, or you are running a build
+from a clone, add it yourself:
+
+```sh
+# installed to /Applications
+export PATH="/Applications/perch.app/Contents/MacOS:$PATH"
+
+# or, from a clone
+export PATH="$PWD/build/perch.app/Contents/MacOS:$PATH"
+```
+
+Everything below works without it too, by running the executable at its full path.
+
 ## Seeing the current settings
 
 ```sh

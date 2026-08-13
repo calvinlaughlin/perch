@@ -49,6 +49,13 @@ open -a perch
 
 Right-click the notch for configuration, **Open at Login**, and quit.
 
+The `perch` command is the app bundle's own executable. Homebrew puts it on your `PATH`; the other
+two routes do not, so add it if you want to use the CLI:
+
+```sh
+export PATH="/Applications/perch.app/Contents/MacOS:$PATH"
+```
+
 Requires **macOS 14+** and **Xcode 26 / Swift 6.2** to build. No `.xcodeproj` is committed — a
 clone builds with `make` and nothing else.
 
