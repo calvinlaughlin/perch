@@ -49,6 +49,17 @@ public final class MediaWidget: NotchWidget {
     /// Decoded album art for `playing`, once it has been prepared off the main thread.
     fileprivate private(set) var artwork: NSImage?
 
+    /// The app the current track is coming from, when it is one that can be opened.
+    ///
+    /// Nil means the artwork is a picture rather than a door: nothing on this Mac claims the
+    /// identifier the system reported. Resolved when the identifier changes rather than on demand,
+    /// because "on demand" is every repaint, and the scrubber repaints twice a second.
+    fileprivate private(set) var player: PlayerApp?
+
+    /// The identifier `player` was resolved from, so it is looked up once per player and not once
+    /// per update.
+    private var resolvedPlayerIdentifier: String?
+
     /// The track as it was when the current announcement started.
     ///
     /// A track change arrives as several updates in quick succession — title first, then artwork,
@@ -223,6 +234,28 @@ public final class MediaWidget: NotchWidget {
         source?.send(command)
     }
 
+    /// Work out which app the artwork should lead to, when the track changes hands.
+    ///
+    /// Guarded on the identifier rather than run unconditionally: updates arrive several times a
+    /// second during playback and all but a handful name the same app, so this is a Launch Services
+    /// query per *player*, not per update.
+    private func resolvePlayer(for bundleIdentifier: String?) {
+        guard let bundleIdentifier else {
+            player = nil
+            resolvedPlayerIdentifier = nil
+            return
+        }
+
+        guard bundleIdentifier != resolvedPlayerIdentifier else { return }
+        resolvedPlayerIdentifier = bundleIdentifier
+        player = PlayerApp.resolve(bundleIdentifier: bundleIdentifier)
+    }
+
+    /// Go to the player: the one thing the panel deliberately does not try to do itself.
+    fileprivate func openPlayer() {
+        player?.open()
+    }
+
     /// Ask the player to jump to a fraction of the way along the track.
     fileprivate func seek(toFraction fraction: Double) {
         guard let target = playing?.seekTarget(fraction: fraction) else { return }
@@ -271,6 +304,7 @@ public final class MediaWidget: NotchWidget {
     private func apply(_ update: NowPlaying?) async {
         let previous = playing
         playing = update
+        resolvePlayer(for: update?.bundleIdentifier)
 
         // Hand the bar back to the player once it has answered. Updates already in flight when the
         // seek went out still carry the old position, so anything that arrives immediately is not
@@ -306,6 +340,13 @@ private struct MediaWidgetView: View {
     let showsArtwork: Bool
     let artworkSize: CGFloat
 
+    /// Whether the pointer is on the artwork, which is the only thing that says it leads anywhere.
+    ///
+    /// The panel has no room for a label and nothing else on it is a link, so the affordance has to
+    /// be the cover itself reacting. Nothing is drawn over it until then: a badge sitting on every
+    /// album cover permanently is a worse trade than a second of discovery.
+    @State private var pointerIsOverArtwork = false
+
     var body: some View {
         if let playing = widget.playing, playing.isPresentable {
             // A band, then the bar under it. The artwork sets the band's height, so the text and
@@ -334,8 +375,38 @@ private struct MediaWidgetView: View {
         }
     }
 
+    /// The album art, which is also the door to the player it came from.
+    ///
+    /// A button only when there is somewhere to go: an identifier nothing on this Mac claims leaves
+    /// the cover as a picture, because a control that does nothing when pressed is worse than no
+    /// control — it is indistinguishable from a broken one.
     @ViewBuilder
     private var artworkView: some View {
+        if let player = widget.player {
+            Button {
+                widget.openPlayer()
+            } label: {
+                artworkImage
+            }
+            .buttonStyle(.plain)
+            .onHover { pointerIsOverArtwork = $0 }
+            .help("Open \(player.name)")
+            .accessibilityLabel("Open \(player.name)")
+            .accessibilityIdentifier(artworkIdentifier)
+
+        } else {
+            artworkImage
+                .accessibilityIdentifier(artworkIdentifier)
+        }
+    }
+
+    /// Kept as one identifier for both cases so a probe can tell decoded art from a placeholder
+    /// whether or not the cover happens to lead anywhere.
+    private var artworkIdentifier: String {
+        widget.artwork == nil ? "media.artwork.missing" : "media.artwork"
+    }
+
+    private var artworkImage: some View {
         Group {
             if let artwork = widget.artwork {
                 Image(nsImage: artwork).resizable()
@@ -347,10 +418,31 @@ private struct MediaWidgetView: View {
             }
         }
         .frame(width: artworkSize, height: artworkSize)
+        // Inside the clip, not over it: an overlay applied after `clipShape` would draw its own
+        // square corners past the cover's rounded ones.
+        .overlay { openPlayerHint }
         .clipShape(
             RoundedRectangle(cornerRadius: PanelMetrics.artworkRadius, style: .continuous)
         )
-        .accessibilityIdentifier(widget.artwork == nil ? "media.artwork.missing" : "media.artwork")
+    }
+
+    /// What the cover turns into under the pointer.
+    ///
+    /// Dimmed with an arrow over it — the same shorthand the rest of the system uses for "this goes
+    /// somewhere else". Sized against the artwork rather than fixed, since `media-artwork-size` is
+    /// configurable and a 14pt glyph on a 24pt cover is a blot.
+    private var openPlayerHint: some View {
+        ZStack {
+            Color.black.opacity(pointerIsOverArtwork ? 0.45 : 0)
+
+            Image(systemName: "arrow.up.forward")
+                .font(.system(size: artworkSize * 0.36, weight: .semibold))
+                .foregroundStyle(.white)
+                .opacity(pointerIsOverArtwork ? 1 : 0)
+        }
+        .animation(.easeOut(duration: 0.12), value: pointerIsOverArtwork)
+        // The button underneath owns the click; this is decoration and must not intercept it.
+        .allowsHitTesting(false)
     }
 
     private func details(for playing: NowPlaying) -> some View {

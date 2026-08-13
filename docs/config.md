@@ -254,6 +254,12 @@ out sideways rather than stacked because the panel hangs off the notch and is mu
 tall — height is the axis worth spending carefully, which is why the times sit beside the bar
 instead of under it.
 
+Clicking the artwork opens the player it came from, launching it if it is not running. The panel
+does transport and seeking and stops there; the queue, the album, the lyrics all live in the
+player's own window, so the cover is the way to it rather than another row of controls. A player
+macOS names but cannot open — a helper process, or an app since deleted — leaves the artwork as a
+picture, since a control that does nothing is worse than none.
+
 Dragging or clicking the scrubber seeks, and the bar follows your pointer rather than the player,
 since the player reports nothing until you let go. A track whose length the player does not
 report — live streams, most browser audio — gets no scrubber at all rather than a bar that cannot
