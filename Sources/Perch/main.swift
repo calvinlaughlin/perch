@@ -62,7 +62,10 @@ if wantsHelp {
 }
 
 if wantsVersion {
-    print("perch \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
+    // `.running`, not `.main`: invoked through the symlink Homebrew puts on PATH, `Bundle.main` is
+    // /opt/homebrew/bin and this reports "dev" for a released build.
+    let version = Bundle.running.infoDictionary?["CFBundleShortVersionString"] as? String
+    print("perch \(version ?? "dev")")
     exit(0)
 }
 
