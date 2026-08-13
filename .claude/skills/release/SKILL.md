@@ -132,14 +132,23 @@ If the workflow was skipped — no `TAP_TOKEN` secret — or failed, fall back t
 make tap
 ```
 
-Either way, **verify the result the way a user meets it**, not by reading the file:
+Either way, **verify the result the way a user meets it**, not by reading the file. `brew fetch` is
+not enough — it resolves and checksums the download, and passes in cases where installing fails.
+In 0.3.0 it passed while `brew install` failed twice over, once because Homebrew would not trust
+the tap and once because an unmanaged `perch.app` was already in `/Applications`:
 
 ```sh
-brew fetch --cask calvinlaughlin/tap/perch
+brew trust --cask calvinlaughlin/tap/perch
+brew install --cask calvinlaughlin/tap/perch
+which perch && perch --version
 ```
 
-That resolves the cask from the published tap and checksums the real download. A cask edit is not
-evidence that installing works.
+That is the whole path: trust, install, and the linked command answering from a shell. A cask edit
+is not evidence that installing works, and a successful download is not evidence either.
+
+If the install refuses with `already an App at '/Applications/perch.app'`, that is a `make install`
+build sitting where Homebrew wants to put its own. Remove it and install again — do not `--force`
+over it, since that leaves Homebrew owning a bundle it did not put there.
 
 ## 9. Report, and say what is still unchecked
 

@@ -45,9 +45,14 @@ jobs:
           echo "::error::the cask never reached $want — did bump-cask run?"
           exit 1
 
+      # Homebrew 6 refuses casks from third-party taps until they are trusted, and a clean runner
+      # trusts nothing — so this step is where a release now fails without it. Trusting the one
+      # cask rather than the whole tap, which is what Homebrew itself recommends and what the
+      # README tells users to run: the runner should meet the same instruction they do.
       - name: Install
         run: |
           brew tap calvinlaughlin/tap
+          brew trust --cask calvinlaughlin/tap/perch
           brew install --cask perch
 
       # An install that reports success while leaving nothing behind is a failure mode this has to

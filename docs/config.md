@@ -60,8 +60,9 @@ terminal and editors can jump straight to the line.
 
 ## The `perch` command
 
-The app bundle's executable is also the CLI — there is no separate binary. `brew install --cask
-perch` puts it on your `PATH`. If you installed by copying the app, or you are running a build
+The app bundle's executable is also the CLI — there is no separate binary. Installing the cask puts
+it on your `PATH` (see [the README](../README.md#install) — Homebrew 6 needs the tap trusted
+first). If you installed by copying the app, or you are running a build
 from a clone, add it yourself:
 
 ```sh

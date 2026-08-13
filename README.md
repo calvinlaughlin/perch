@@ -31,8 +31,13 @@ the new one on its own, then revert.</sub>
 ## Install
 
 ```sh
+brew trust --cask calvinlaughlin/tap/perch
 brew install --cask calvinlaughlin/tap/perch
 ```
+
+Homebrew 6 refuses casks from taps outside `homebrew/core` until you say you trust them, so the
+first line is not optional. Trusting the one cask rather than the whole tap is deliberate: it does
+not extend to anything else published there, now or later.
 
 Or download the [latest release](https://github.com/calvinlaughlin/perch/releases/latest), unzip,
 and drag `perch.app` to `/Applications`. It is signed and notarized, so it opens without a
