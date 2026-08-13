@@ -42,7 +42,56 @@ xcrun notarytool store-credentials perch \
 That stores it in the keychain under the profile name `perch`, which the Makefile expects. The
 password never appears in the repo or in a command you would paste into an issue.
 
+### 4. CI release secrets
+
+Only needed for the workflow path below; the local path uses the keychain and needs none of this.
+
+`release.yml` signs and notarises on a runner, so the identity has to be reachable from there.
+Export the certificate **with its private key** from Keychain Access → your Developer ID
+Application identity → File → Export Items → `.p12`, then:
+
+```sh
+base64 -i certificate.p12 | pbcopy          # → secret MACOS_CERT_P12
+                                            # → secret MACOS_CERT_PASSWORD (the .p12 password)
+```
+
+Notarisation from CI uses an **App Store Connect API key** rather than an app-specific password —
+a key can be revoked on its own, and it is not attached to your Apple ID. Create one at
+[App Store Connect → Users and Access → Integrations](https://appstoreconnect.apple.com/access/integrations/api)
+with the **Developer** role, and download the `.p8` once (Apple will not show it again):
+
+```sh
+base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy    # → secret APPLE_API_KEY_P8
+                                            # → secret APPLE_API_KEY_ID (the 10-character key ID)
+                                            # → secret APPLE_API_ISSUER_ID (the issuer UUID)
+```
+
+Put all five in the **`release` environment** (Settings → Environments → release), not in
+repository secrets. An environment can require a reviewer, which means no workflow run reaches the
+signing identity without someone approving that specific run — worth setting, since this is a
+public repository and the certificate is the one credential that cannot be un-leaked without
+revoking and re-signing everything.
+
+The workflow triggers on tags only. It cannot be started by a pull request, a branch push, or
+anything an outside contributor can cause.
+
 ## Cutting a release
+
+**Push a tag.** `release.yml` builds, signs, notarises, verifies and publishes from the tag alone;
+`bump-cask` and `release-smoke-test` then run from `release: published` as they already did.
+
+```sh
+$EDITOR Makefile                    # bump VERSION
+git commit -am "Release 0.3.0"      # via a PR — main is protected
+git tag -a v0.3.0 -m "perch 0.3.0"
+git push origin v0.3.0
+```
+
+The tag is the instruction and `VERSION` is the fact: the workflow compares them and refuses to
+build if they disagree, rather than publishing a `v0.3.0` containing `0.2.0`. It also checks CI is
+green **on that commit**, not on the branch.
+
+### Or locally
 
 Say **`/release`** to a coding agent. That runs `.claude/skills/release/SKILL.md`, which is this
 document turned into a procedure: preflight, choose the version, bump, build, notarise, and then
@@ -89,12 +138,17 @@ is the one users experience, so check both.
 A stapled ticket matters because without it Gatekeeper has to reach Apple to check — so a first
 launch on a machine that is offline fails.
 
-### What CI checks after a release
+### What CI does
 
-Two workflows fire on `release: published`, and between them they check the things this machine
-cannot. It already trusts the signing certificate, already has perch in `/Applications`, and has
-run every intermediate build — so "it opens here" is compatible with a download nobody else can
-open.
+**`release.yml`** fires on a `v*` tag and is the release itself: it checks the tag against
+`VERSION` and CI against the commit, imports the signing identity into a keychain of its own,
+runs the same `make release` a laptop would, asserts the four facts below, and publishes. The
+keychain is deleted whether the job passes or fails.
+
+Then two workflows fire on `release: published`, and between them they check the things the
+building machine cannot. It already trusts the signing certificate, already has perch in
+`/Applications`, and has run every intermediate build — so "it opens here" is compatible with a
+download nobody else can open.
 
 - **`bump-cask.yml`** points the Homebrew cask at the new release. It checksums the asset **as
   published** rather than the local zip it was built from; those are normally identical, and when

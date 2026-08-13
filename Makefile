@@ -19,7 +19,8 @@ CONTENTS   := $(APP)/Contents
 SWIFT_SOURCES := Sources Tests Package.swift
 
 .PHONY: all app adapter icon build run test check arch probe ui-probe fmt lint \
-        sign notarize release release-preflight verify-release tap clean install uninstall
+        sign notarize release release-preflight verify-release tap clean install uninstall \
+        print-version
 
 all: app
 
@@ -190,6 +191,16 @@ NOTARY_PROFILE ?= perch
 DIST_DIR := build/dist
 DIST_ZIP := $(DIST_DIR)/$(NAME)-$(VERSION).zip
 
+# How notarytool authenticates. A keychain profile is the right answer on a laptop and impossible
+# on a fresh runner, which has no keychain to have stored one in. Setting NOTARY_KEY_PATH switches
+# to an App Store Connect API key, so `make release` is the same command in both places rather than
+# CI reimplementing the release around the Makefile.
+ifdef NOTARY_KEY_PATH
+NOTARY_AUTH := --key "$(NOTARY_KEY_PATH)" --key-id "$(NOTARY_KEY_ID)" --issuer "$(NOTARY_ISSUER)"
+else
+NOTARY_AUTH := --keychain-profile "$(NOTARY_PROFILE)"
+endif
+
 ## sign — Developer ID sign the bundle with the hardened runtime.
 ##
 ## Nested code is signed first and the bundle last: a signature covers what is inside it, so
@@ -205,12 +216,14 @@ sign: app
 ## Stapling matters: without it Gatekeeper has to reach Apple to check, so a first launch offline
 ## fails. Store credentials once with:
 ##   xcrun notarytool store-credentials $(NOTARY_PROFILE) ##     --apple-id <you@example.com> --team-id <TEAMID> --password <app-specific-password>
+##
+## In CI, set NOTARY_KEY_PATH / NOTARY_KEY_ID / NOTARY_ISSUER instead — see release.yml.
 notarize: sign
 	@mkdir -p "$(DIST_DIR)"
 	@rm -f "$(DIST_ZIP)"
 	@# ditto, not zip: it preserves the symlinks and extended attributes a framework depends on.
 	@ditto -c -k --keepParent "$(APP)" "$(DIST_ZIP)"
-	@xcrun notarytool submit "$(DIST_ZIP)" --keychain-profile "$(NOTARY_PROFILE)" --wait
+	@xcrun notarytool submit "$(DIST_ZIP)" $(NOTARY_AUTH) --wait
 	@xcrun stapler staple "$(APP)"
 	@rm -f "$(DIST_ZIP)"
 	@ditto -c -k --keepParent "$(APP)" "$(DIST_ZIP)"
@@ -226,6 +239,14 @@ release-preflight:
 
 ## release — the full path to something a stranger can download and open.
 release: notarize verify-release
+
+## print-version — the version being built, for scripts that need to agree with it.
+##
+## The release workflow compares this against the pushed tag: the tag is the instruction, the
+## Makefile is the fact, and a release built from one and published under the other is worse than
+## no release. `make -s print-version` prints it bare.
+print-version:
+	@echo "$(VERSION)"
 
 ## tap — point the Homebrew cask at the published release of $(VERSION).
 ##

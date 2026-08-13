@@ -15,6 +15,7 @@ failures=0
 
 ok()   { printf '  ok    %s\n' "$1"; }
 fail() { printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); }
+warn() { printf '  note  %s\n' "$1"; }
 
 echo "PREFLIGHT"
 
@@ -78,19 +79,28 @@ fi
 
 # --- what Apple needs --------------------------------------------------------------------------
 #
-# Both of these fail at the end of a long build otherwise, after notarisation has already been
-# waited on, which is the most expensive moment to discover a missing credential.
+# Only for a local `make release`. Releases normally come from release.yml, which signs on a runner
+# with the `release` environment's secrets and needs nothing on this machine — so a laptop without
+# a certificate is no longer a reason to refuse to release. These stay as checks rather than being
+# dropped because when you *are* building locally, both otherwise fail at the end of a long build,
+# after notarisation has already been waited on: the most expensive moment to find out.
+#
+# LOCAL=1 makes them hard failures again, for anyone deliberately cutting a release by hand.
+
+credential_note() {
+    if [ "${LOCAL:-0}" = "1" ]; then fail "$1"; else warn "$1 (fine — release.yml signs in CI)"; fi
+}
 
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application"; then
     ok "Developer ID Application certificate present"
 else
-    fail "no Developer ID Application certificate — see docs/releasing.md"
+    credential_note "no Developer ID Application certificate — see docs/releasing.md"
 fi
 
 if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
     ok "notary profile '$NOTARY_PROFILE' works"
 else
-    fail "notary profile '$NOTARY_PROFILE' missing or rejected — see docs/releasing.md"
+    credential_note "notary profile '$NOTARY_PROFILE' missing or rejected — see docs/releasing.md"
 fi
 
 # --- the code ----------------------------------------------------------------------------------

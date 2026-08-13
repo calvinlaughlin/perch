@@ -45,23 +45,36 @@ their notch behaves differently.
 State the version and the one-line reason in your final report. Do not ask about it separately —
 it arrives at the single stop below with everything else.
 
-## 3. Bump and push
+## 3. Bump, via a pull request
 
-Edit `VERSION` in the `Makefile`. Commit **directly to main** and push — this is the one place the
-repo skips a PR, because it is a one-line change that `make check` has already covered:
+Edit `VERSION` in the `Makefile`. **main is protected** — it requires a pull request and a green
+`Check`, so the bump cannot be pushed directly however small it is:
 
 ```sh
+git checkout -b release-<version>
 git commit -am "Release <version>"
-git push origin main
+git push -u origin release-<version>
+gh pr create --title "Release <version>" --body "…"
 ```
 
-Then wait for CI on main and **abort the release if it goes red**:
+Wait for CI, then merge and return to main:
 
 ```sh
-gh run watch $(gh run list --branch main --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
+gh pr checks <n> --watch --fail-fast
+gh pr merge <n> --squash --delete-branch
+git checkout main && git pull
 ```
 
-## 4. Build, sign, notarise
+**Abort if CI goes red.** Nothing is public yet; a red build is a reason to stop, not to retry.
+
+## 4. Build, sign, notarise — usually not yours to do
+
+`release.yml` does this on a runner when a `v*` tag is pushed, and that is the normal path: it
+checks the tag against `VERSION` and CI against the commit, signs, notarises, verifies, and
+publishes. **So step 7 is the whole of the release** and there is nothing to build here.
+
+Build locally only if the workflow is unavailable — no `release` environment secrets, a runner
+outage, or the user asks for it. Then:
 
 ```sh
 make release
@@ -94,16 +107,36 @@ upgrading, not for someone reading the diff:
 
 ## 6. Stop — the single confirmation
 
-Show the user, in one message: the version and why, the verification evidence from step 4, and the
-full notes. Ask whether to publish.
+Show the user, in one message: the version and why, the evidence gathered so far, and the full
+notes. Ask whether to publish.
 
-Nothing so far is visible to anyone but them. Everything after is.
+Nothing so far is visible to anyone but them. Pushing the tag is what starts a signed build and a
+public release, and it cannot be taken back once the cask has moved.
 
-## 7. Publish
+## 7. Publish — push the tag
 
 ```sh
 git tag -a v<version> -m "perch <version>"
 git push origin v<version>
+```
+
+That is the whole of it. `release.yml` builds, signs, notarises, verifies and publishes; the
+`release` environment may hold the run for a reviewer first. Watch it, and **read the failure
+rather than retrying** — a signing or notarisation failure means the artefact is wrong, not that
+the run was unlucky:
+
+```sh
+gh run watch $(gh run list --workflow Release --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
+```
+
+If a tag has to be withdrawn before the release published, `git push --delete origin v<version>`
+and delete it locally. Once the release exists and the cask has moved, go forward with a new
+version instead.
+
+If you built locally at step 4 because the workflow was unavailable, publish that artefact by hand
+instead:
+
+```sh
 gh release create v<version> build/dist/perch-<version>.zip \
   --title "perch <version>" --notes "<the notes>"
 ```
@@ -152,7 +185,8 @@ Then two things, plainly:
 
 - **Never report a step as verified without the command output that shows it.** Every claim in the
   final report traces to something in this session's transcript. "Notarised" means `Accepted`
-  appeared, not that `make release` exited zero.
+  appeared in a log you read — in the workflow run when CI built it, locally otherwise — not that
+  a command exited zero.
 - **Never skip preflight**, including on a re-run after a failure partway through.
 - If a tag for the version already exists, stop — that version is published; pick the next one.
 - Do not create the GitHub release before the tag is pushed; a release without its tag is a dangling

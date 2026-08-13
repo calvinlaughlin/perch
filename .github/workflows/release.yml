@@ -1,0 +1,186 @@
+name: Release
+
+# Build, sign, notarise and publish a release, triggered by pushing a tag.
+#
+# The half of the release that was still local. `bump-cask` and `release-smoke-test` already run
+# from `release: published`, so this closes the loop: push v0.3.0 and everything after happens
+# here, on a machine that has never seen perch, from the tag alone.
+#
+# Doing it here rather than on a laptop buys reproducibility and costs secrecy: the Developer ID
+# signing identity has to live in GitHub secrets instead of one keychain. That is the whole of the
+# trade, and it is why this triggers on tags only — never on a branch, never on a pull request,
+# and never on anything an outside contributor can cause. See docs/releasing.md for the secrets
+# and how to rotate them.
+#
+# The `release` environment is the second half of that defence: give it required reviewers and no
+# workflow run can reach the signing identity without a human approving that specific run.
+
+on:
+  push:
+    tags: ["v*"]
+
+# Never more than one release in flight, and never cancel one partway: an interrupted run can
+# leave a notarisation submitted with nothing waiting to staple it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    environment: release
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: |
+          newest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$newest" ]; then
+            echo "::error::no Xcode found on this runner"; exit 1
+          fi
+          echo "using $newest"
+          sudo xcode-select -switch "$newest"
+
+      # The tag is the instruction and the Makefile is the fact. If they disagree, the release
+      # would be built from one version and published under another, so stop before signing
+      # anything rather than producing a v0.3.0 release containing 0.2.0.
+      - name: The tag matches VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(make -s print-version)
+          echo "tag=$tag makefile=$version"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match VERSION $version in the Makefile"
+            exit 1
+          fi
+
+      # A tag can point anywhere. Releasing one whose commit never passed CI is how a red build
+      # reaches users, so this asks about this exact commit rather than about the branch.
+      - name: CI is green on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh run list --workflow CI --commit "$GITHUB_SHA" \
+            --limit 1 --json conclusion -q '.[0].conclusion')
+          echo "CI on $GITHUB_SHA: ${conclusion:-none}"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI is not green on $GITHUB_SHA (got '${conclusion:-no run}')"
+            exit 1
+          fi
+
+      # A keychain of this run's own, deleted in the always-run step at the end. The default login
+      # keychain on a runner is shared with whatever else the job does; a dedicated one keeps the
+      # signing identity's lifetime exactly as long as the job.
+      - name: Import the signing identity
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$CERT_P12" ]; then
+            echo "::error::MACOS_CERT_P12 is not set — see docs/releasing.md"
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password=$(uuidgen)
+
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 900 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          # Without this codesign blocks on a GUI prompt that nothing can answer, and the job
+          # hangs until it times out rather than failing.
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+
+          # Keep the default keychain in the search list: notarytool and stapler still need it.
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          identity=$(security find-identity -v -p codesigning "$keychain" \
+            | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+          if [ -z "$identity" ]; then
+            echo "::error::no Developer ID Application identity in the imported certificate"
+            exit 1
+          fi
+          echo "found: $identity"
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Write the notarisation key
+        env:
+          API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          if [ -z "$API_KEY_P8" ]; then
+            echo "::error::APPLE_API_KEY_P8 is not set — see docs/releasing.md"
+            exit 1
+          fi
+          echo "$API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          chmod 600 "$RUNNER_TEMP/notary.p8"
+
+      # The same `make release` a laptop runs: build, sign nested-first, zip with ditto, submit,
+      # wait, staple, re-zip, verify. CI supplies the credentials and nothing else.
+      - name: Build, sign, notarise
+        env:
+          NOTARY_KEY_PATH: ${{ runner.temp }}/notary.p8
+          NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: make release
+
+      # `make release` already ran verify-release, but it prints rather than asserts. These are the
+      # four facts the release is claimed on, each failing the job on its own.
+      - name: The result is what it claims to be
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+
+          test -f "build/dist/perch-$version.zip" || {
+            echo "::error::no zip at build/dist/perch-$version.zip"; exit 1; }
+
+          xcrun stapler validate build/perch.app || {
+            echo "::error::the notarisation ticket is not stapled"; exit 1; }
+
+          spctl --assess --type execute --verbose=4 build/perch.app 2>&1 | tee assessment.txt
+          grep -q "source=Notarized Developer ID" assessment.txt || {
+            echo "::error::Gatekeeper did not accept this as a notarised Developer ID build"
+            exit 1; }
+
+          built=$(build/perch.app/Contents/MacOS/perch --version | awk '{print $2}')
+          [ "$built" = "$version" ] || {
+            echo "::error::built binary reports $built, expected $version"; exit 1; }
+
+          echo "verified $version: stapled, Gatekeeper-accepted, version matches"
+
+      # Publishing is what makes it real, and it is the last thing that happens. Everything above
+      # can fail without anyone downloading a broken build.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          previous=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || echo "")
+
+          if [ -n "$previous" ]; then
+            notes="**Full changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}"
+          else
+            notes=""
+          fi
+
+          gh release create "$GITHUB_REF_NAME" "build/dist/perch-$version.zip" \
+            --title "perch $version" \
+            --notes "$notes" \
+            --generate-notes
+
+      # Runs even when something above failed, because a job that dies mid-signing would otherwise
+      # leave the identity sitting in a keychain on the runner.
+      - name: Clean up
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/cert.p12"
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
