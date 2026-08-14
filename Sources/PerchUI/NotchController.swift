@@ -8,7 +8,7 @@ import SwiftUI
 /// display arrangement changes. Tearing down and recreating the window on every screen change is
 /// the usual way notch apps end up with orphaned panels after a lid close or monitor unplug.
 @MainActor
-public final class NotchController: NotchAttention {
+public final class NotchController: AttributedAttention {
 
     private let model: NotchModel
     private let host: WidgetHost
@@ -207,9 +207,10 @@ public final class NotchController: NotchAttention {
     ///
     /// Timing lives here rather than in the state machine, which stays pure and synchronous so
     /// every transition can be tested without waiting on a clock.
-    public func requestPeek() {
-        guard config.peekOnTrackChange else { return }
+    public func requestPeek(from kind: String) {
+        guard announcementsAllowed(for: kind) else { return }
 
+        model.peekRequester = kind
         deliver(.peekRequested)
         peekExpiryTask?.cancel()
 
@@ -217,8 +218,20 @@ public final class NotchController: NotchAttention {
         peekExpiryTask = Task { [weak self] in
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
+            self?.model.peekRequester = nil
             self?.deliver(.peekExpired)
         }
+    }
+
+    /// Whether this widget is permitted to announce.
+    ///
+    /// `peek-on-track-change` is a core key that only ever meant something to `media` — it predates
+    /// there being a second widget with anything to announce. Gating *every* peek on it would mean
+    /// someone who turned off track announcements silently got no volume HUD either, which is not
+    /// what that line says. Scoped to media until the key can be moved into the media namespace,
+    /// which cannot happen without breaking existing config files.
+    private func announcementsAllowed(for kind: String) -> Bool {
+        kind == "media" ? config.peekOnTrackChange : true
     }
 
     private func clicked() {

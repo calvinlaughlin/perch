@@ -25,6 +25,7 @@ public final class WidgetRegistry {
         shared.register(MediaWidget.self)
         shared.register(ClockWidget.self)
         shared.register(NotesWidget.self)
+        shared.register(HudWidget.self)
     }
 
     /// Register a widget type under its `kind`.

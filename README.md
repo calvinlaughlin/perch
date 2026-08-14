@@ -92,8 +92,13 @@ widget with documentation, and its output is itself a valid config file. Full re
 
 ## Widgets
 
-Three ship today — `media`, `clock`, and `notes`. Only `media` is on by default; the rest are a
-line of config away. A widget is one file: it declares a name, parses its own settings, says where
+Four ship today — `media`, `clock`, `notes`, and `hud`. Only `media` is on by default; the rest are
+a line of config away.
+
+`hud` puts volume changes in the notch instead of the large square macOS draws in the middle of
+your screen. It does that by handling the volume keys itself, so macOS is never asked to draw one
+— which needs **Accessibility**. Without the permission it still shows the level, but alongside
+the system overlay rather than instead of it; `hud-take-keys = false` stops it asking. A widget is one file: it declares a name, parses its own settings, says where
 it draws, and starts and stops its own work. Adding one needs no change to the config schema.
 
 ```ini

@@ -69,14 +69,18 @@ struct NotchContentView: View {
 
     /// Widgets in a peek: compact, centred, no controls.
     ///
-    /// Only widgets with something to announce appear. A peek belongs to whatever just changed —
+    /// Only the widget that asked for the peek appears. A peek belongs to whatever just changed —
     /// everything else configured into the panel is beside the point for the two seconds it is up,
     /// and a scratchpad arriving because a track changed is not an announcement of anything.
+    ///
+    /// Filtering on the requester rather than on merely having a `peekBody` is what lets a second
+    /// widget announce at all: turning the volume down would otherwise show you the current track,
+    /// because `MediaWidget.peekBody` is non-nil whenever there is one.
     private var peekContent: some View {
         let rect = model.layout.peekRect
         let housingHeight = model.layout.hardwareRect.height
         let inset = PanelMetrics.panelInset
-        let announcements = host.widgets(at: .expanded).compactMap(\.peekBody)
+        let announcements = host.announcers(for: model.peekRequester).compactMap(\.peekBody)
 
         return HStack(spacing: PanelMetrics.columnGap) {
             ForEach(Array(announcements.enumerated()), id: \.offset) { _, peek in
