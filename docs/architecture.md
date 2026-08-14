@@ -88,3 +88,25 @@ suspect — the adapter's own `test` command reports whether the entitlement sti
 Upstream builds with CMake; perch compiles the same sources with clang from its own Makefile, so a
 clone still needs nothing but `make`. See
 [`Vendor/mediaremote-adapter/VENDORED.md`](../Vendor/mediaremote-adapter/VENDORED.md).
+
+## Replacing the volume overlay
+
+You cannot turn the macOS volume overlay off. The obvious route is taking its launchd agent out of
+service, and it does not work:
+
+```
+$ launchctl bootout gui/501/com.apple.OSDUIHelper
+Boot-out failed: 150: Operation not permitted while System Integrity Protection is engaged
+```
+
+SIP is on by default, so that fails for effectively everyone, and `killall` reports success while
+leaving the process running. There is no API for "do not draw the OSD".
+
+So `hud` does not suppress the overlay — it stops it being *asked for*. `VolumeKeyTap` consumes the
+volume key with a `CGEventTap` before macOS sees it, and `VolumeControl` applies the change perch
+just swallowed. macOS never learns a key was pressed. That is why the widget needs Accessibility,
+and why being denied is an ordinary state rather than an error: without the tap perch watches the
+volume instead of owning it, and the system overlay comes back.
+
+Measured, with the tap active a volume keypress produces **zero** `OSDUIHelper` windows; with perch
+stopped, the same keypress produces one.

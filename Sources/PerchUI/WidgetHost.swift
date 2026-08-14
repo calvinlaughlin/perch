@@ -34,7 +34,7 @@ public final class WidgetHost {
     /// What the notch is currently showing.
     private var state: NotchState = .collapsed
 
-    private weak var attention: (any NotchAttention)?
+    private weak var attention: (any AttributedAttention)?
 
     public init(registry: WidgetRegistry = .shared) {
         self.registry = registry
@@ -51,15 +51,26 @@ public final class WidgetHost {
 
         let (built, diagnostics) = registry.makeAll(for: config)
         widgets = built
-        if let attention { for widget in widgets { widget.attach(attention: attention) } }
+        if let attention { attachEach(to: attention) }
         syncActivation()
         return diagnostics
     }
 
     /// Give every widget a way to ask for attention.
-    public func attach(attention: any NotchAttention) {
+    public func attach(attention: any AttributedAttention) {
         self.attention = attention
-        for widget in widgets { widget.attach(attention: attention) }
+        attachEach(to: attention)
+    }
+
+    /// Hand each widget its own proxy, so a peek request arrives knowing who made it.
+    ///
+    /// Every widget used to share one attention object, which was fine while `media` was the only
+    /// thing that ever peeked and wrong the moment anything else did: the notch had no way to tell
+    /// whose announcement it was showing.
+    private func attachEach(to attention: any AttributedAttention) {
+        for widget in widgets {
+            widget.attach(attention: WidgetAttention(kind: widget.kind, target: attention))
+        }
     }
 
     /// Note that the notch changed state, activating and deactivating as needed.
@@ -85,6 +96,22 @@ public final class WidgetHost {
     /// The widgets drawn in a given position, in config order.
     public func widgets(at placement: Placement) -> [any NotchWidget] {
         widgets.filter { $0.placement == placement }
+    }
+
+    /// The widgets whose announcement a peek belongs to.
+    ///
+    /// A peek is one widget saying one thing, so this is the requester and nothing else. Filtering
+    /// on merely *having* a `peekBody` — which is what the panel used to do — shows every
+    /// announcing widget at once: turning the volume down would display the current track, because
+    /// `MediaWidget.peekBody` is non-nil whenever there is one.
+    ///
+    /// Lives here rather than inline in the view so the rule can be tested without rendering.
+    ///
+    /// - Parameter requester: the kind that asked, or nil when no peek is up.
+    /// - Returns: the widgets to draw in the peek, empty when nobody has anything to say.
+    public func announcers(for requester: String?) -> [any NotchWidget] {
+        guard let requester else { return [] }
+        return widgets(at: .expanded).filter { $0.kind == requester && $0.peekBody != nil }
     }
 
     // MARK: - Lifecycle

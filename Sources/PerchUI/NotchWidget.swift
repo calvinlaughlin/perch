@@ -27,6 +27,32 @@ public protocol NotchAttention: AnyObject, Sendable {
     func requestPeek()
 }
 
+/// The same request, carrying who made it.
+///
+/// A peek belongs to whatever just changed, so the notch has to know which widget asked in order
+/// to show that widget and not its neighbours. Widgets are deliberately not asked to say — they
+/// call ``NotchAttention/requestPeek()`` and a per-widget proxy in `WidgetHost` fills in the kind,
+/// so a widget cannot name someone else and cannot forget to name itself.
+@MainActor
+public protocol AttributedAttention: AnyObject, Sendable {
+    /// Ask the notch to peek on behalf of the widget of this kind.
+    func requestPeek(from kind: String)
+}
+
+/// Hands one widget's peek requests on with its kind attached.
+@MainActor
+final class WidgetAttention: NotchAttention {
+    private let kind: String
+    private weak var target: (any AttributedAttention)?
+
+    init(kind: String, target: any AttributedAttention) {
+        self.kind = kind
+        self.target = target
+    }
+
+    func requestPeek() { target?.requestPeek(from: kind) }
+}
+
 @MainActor
 public protocol NotchWidget: AnyObject {
 

@@ -31,6 +31,14 @@ public final class NotchModel {
     /// Bounds-checking lives at the read site — the widget list can shrink under a config reload.
     public var expandedPageIndex: Int = 0
 
+    /// The kind of widget whose announcement the current peek belongs to, or `nil` when no peek is
+    /// up.
+    ///
+    /// A peek is one widget saying one thing. Without this the panel drew every widget that had a
+    /// `peekBody`, which was invisible while `media` was the only one that ever announced and
+    /// wrong as soon as anything else did — a volume change would have shown you the current track.
+    public var peekRequester: String?
+
     public init(layout: NotchLayout, config: Config = Config()) {
         self.layout = layout
         self.config = config
