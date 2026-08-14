@@ -133,18 +133,15 @@ public final class HudWidget: NotchWidget {
             _ = self
         }
 
-        guard tap.start() else {
-            Log.widget.info(
-                """
-                hud: volume keys not intercepted — perch has no Accessibility permission, so macOS \
-                will keep drawing its own overlay. Grant it in System Settings › Privacy & \
-                Security › Accessibility, or set `hud-take-keys = false` to stop asking.
-                """
-            )
-            return
+        tap.onStarted = {
+            Log.widget.info("hud: volume keys taken over; macOS will not draw its own overlay")
         }
 
+        // Asks for Accessibility if it is missing, and takes the keys the moment it is granted —
+        // no relaunch. Held either way: the tap keeps watching for the grant, and dropping it here
+        // would mean the answer arrives with nobody listening.
         keyTap = tap
+        tap.startAskingIfNeeded()
     }
 
     /// Take a reading, and decide whether it is worth interrupting anyone over.

@@ -30,8 +30,13 @@ public final class VolumeKeyTap: @unchecked Sendable {
     /// The `fine` flag is Shift-Option, which macOS uses for quarter-sized steps.
     public var onKey: (@MainActor (Key, _ fine: Bool) -> Void)?
 
+    /// Called once the tap actually starts, including when that happens later because the user
+    /// granted Accessibility while perch was already running.
+    public var onStarted: (@MainActor () -> Void)?
+
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var permissionObserver: (any NSObjectProtocol)?
 
     public init() {}
 
@@ -89,10 +94,61 @@ public final class VolumeKeyTap: @unchecked Sendable {
         return true
     }
 
+    /// Start, asking for Accessibility if it is missing, and start for real once it is granted.
+    ///
+    /// What makes this behave the way people expect an app to. Creating the tap and giving up is
+    /// silent — the user sees two overlays, is told nothing, and has no idea a permission is
+    /// involved. Prompting explains it, and watching for the grant means the volume keys start
+    /// working the moment they flip the switch rather than after they think to quit and reopen.
+    ///
+    /// The prompt is macOS's own, and it is shown at most once per run: the system only surfaces
+    /// it when perch is not already trusted.
+    public func startAskingIfNeeded() {
+        if start() {
+            let started = onStarted
+            MainActor.assumeIsolated { started?() }
+            return
+        }
+
+        _ = Self.isPermitted(prompt: true)
+        observePermissionChanges()
+    }
+
+    /// Retry when the Accessibility list changes.
+    ///
+    /// Event-driven rather than polled — a timer waiting for a permission that may never come is
+    /// exactly the always-on background work perch does not do.
+    private func observePermissionChanges() {
+        guard permissionObserver == nil else { return }
+
+        permissionObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.accessibility.api"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // The notification lands a moment before the change is readable, so a tap created
+            // immediately still fails. Trying again shortly after is the difference between
+            // working on grant and appearing not to.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard let self, self.tap == nil, self.start() else { return }
+                self.stopObserving()
+                MainActor.assumeIsolated { self.onStarted?() }
+            }
+        }
+    }
+
+    private func stopObserving() {
+        if let permissionObserver {
+            DistributedNotificationCenter.default().removeObserver(permissionObserver)
+        }
+        permissionObserver = nil
+    }
+
     /// Stop intercepting, giving the keys back to macOS.
     ///
     /// Calling twice is a no-op.
     public func stop() {
+        stopObserving()
         if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
