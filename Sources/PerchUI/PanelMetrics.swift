@@ -79,6 +79,40 @@ public enum PanelMetrics {
     /// Rounded corners on artwork.
     public static let artworkRadius = unit * 2  // 8
 
+    // MARK: - The agenda
+
+    /// One line of the agenda: a time, a title, and whatever is on the right of it.
+    public static let agendaRow = unit * 5  // 20
+
+    /// Between agenda rows.
+    ///
+    /// Tighter than `rowGap`, because this is a list rather than a stack of bands: rows a full gap
+    /// apart stop reading as one thing you scan down.
+    public static let agendaGap = unit * 2  // 8
+
+    /// The time column, wide enough for the longest thing that goes in it: `12:30 AM`.
+    ///
+    /// Fixed rather than sized to content, so the titles beside it line up down the panel instead
+    /// of stepping in and out with the hour.
+    public static let agendaTime = unit * 14  // 56
+
+    /// The calendar-colour bar at the head of a row.
+    public static let agendaAccent = unit  // 4
+
+    /// How many agenda rows fit in a given height.
+    ///
+    /// The card fills the panel it is handed rather than taking a configured number of rows: the
+    /// panel already has one number for how tall it is, and a second one that had to agree with it
+    /// is a second one that can disagree with it.
+    public static func agendaRows(inHeight height: CGFloat) -> Int {
+        max(1, Int((height + agendaGap) / (agendaRow + agendaGap)))
+    }
+
+    /// What a given number of agenda rows needs vertically.
+    public static func calendarHeight(rows: Int) -> CGFloat {
+        CGFloat(rows) * agendaRow + CGFloat(max(0, rows - 1)) * agendaGap
+    }
+
     // MARK: - The budget
 
     /// Content height available inside a panel of a given height.

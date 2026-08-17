@@ -27,6 +27,10 @@ struct PanelMetricsTests {
             ("artwork", PanelMetrics.artwork),
             ("peekArtwork", PanelMetrics.peekArtwork),
             ("artworkRadius", PanelMetrics.artworkRadius),
+            ("agendaRow", PanelMetrics.agendaRow),
+            ("agendaGap", PanelMetrics.agendaGap),
+            ("agendaTime", PanelMetrics.agendaTime),
+            ("agendaAccent", PanelMetrics.agendaAccent),
         ]
 
         for (name, value) in values {
@@ -42,6 +46,25 @@ struct PanelMetricsTests {
         let available = PanelMetrics.contentHeight(panelHeight: Config().expandedHeight)
 
         #expect(PanelMetrics.mediaHeight() == available)
+    }
+
+    @Test("Three agenda rows fill the same panel exactly")
+    func agendaFitsExactly() {
+        // The calendar card takes as many rows as it is given room for rather than a configured
+        // number, so this is the arithmetic that decides what a default panel shows. Exactly, not
+        // within: a spare point here is a fourth row that half-appears.
+        let available = PanelMetrics.contentHeight(panelHeight: Config().expandedHeight)
+
+        #expect(PanelMetrics.calendarHeight(rows: 3) == available)
+        #expect(PanelMetrics.agendaRows(inHeight: available) == 3)
+    }
+
+    @Test("A taller panel shows more of the day, a shorter one still shows something")
+    func agendaRowsFollowTheHeight() {
+        #expect(PanelMetrics.agendaRows(inHeight: PanelMetrics.calendarHeight(rows: 5)) == 5)
+        // Never zero. A panel too short for a row still has to draw the one that matters rather
+        // than going blank.
+        #expect(PanelMetrics.agendaRows(inHeight: 0) == 1)
     }
 
     @Test("The shipped default is the height the layout asks for")
