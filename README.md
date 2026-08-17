@@ -92,13 +92,21 @@ widget with documentation, and its output is itself a valid config file. Full re
 
 ## Widgets
 
-Four ship today — `media`, `clock`, `notes`, and `hud`. Only `media` is on by default; the rest are
-a line of config away.
+Five ship today — `media`, `clock`, `notes`, `hud`, and `calendar`. Only `media` is on by default;
+the rest are a line of config away.
 
 `hud` puts volume changes in the notch instead of the large square macOS draws in the middle of
 your screen. It does that by handling the volume keys itself, so macOS is never asked to draw one
 — which needs **Accessibility**. Without the permission it still shows the level, but alongside
-the system overlay rather than instead of it; `hud-take-keys = false` stops it asking. A widget is one file: it declares a name, parses its own settings, says where
+the system overlay rather than instead of it; `hud-take-keys = false` stops it asking.
+
+`calendar` shows what is left of today, and announces a meeting a few minutes before it starts —
+in the notch, where your eyes already are, rather than in a corner you have trained yourself to
+ignore. It reads your calendar, so it asks for **Calendars** access the first time it draws and
+never before; refusing leaves the rest of perch working. Nothing is written and nothing leaves the
+machine.
+
+A widget is one file: it declares a name, parses its own settings, says where
 it draws, and starts and stops its own work. Adding one needs no change to the config schema.
 
 ```ini
@@ -113,7 +121,7 @@ See **[docs/writing-a-widget.md](docs/writing-a-widget.md)**.
 
 Working and in daily use, but early. Known gaps:
 
-- Only three widgets so far.
+- Only five widgets so far.
 - Rendering-level polish (as opposed to layout) is not covered by the automated checks — see
   [CONTRIBUTING.md](CONTRIBUTING.md#what-the-probes-cannot-see).
 

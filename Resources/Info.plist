@@ -29,6 +29,15 @@
 	<key>LSUIElement</key>
 	<true/>
 
+	<!-- Read-only, and only when `widget = calendar` is configured: perch draws what is left of
+	     today in the notch. Nothing is written and nothing leaves the machine. "Full access" is
+	     what macOS calls read access to events — the narrower write-only grant cannot read them.
+
+	     This string is load-bearing. TCC terminates a process that touches EventKit without it,
+	     so it ships with the first call rather than after it. -->
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>perch shows what is next on your calendar in the notch.</string>
+
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSSupportsAutomaticTermination</key>

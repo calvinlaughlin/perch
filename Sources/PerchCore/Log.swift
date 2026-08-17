@@ -53,4 +53,7 @@ public struct Log: Sendable {
 
     /// Now-playing sources and playback control.
     public static let media = Log(category: "media")
+
+    /// Calendar access and the events read through it.
+    public static let calendar = Log(category: "calendar")
 }

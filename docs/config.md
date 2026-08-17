@@ -357,6 +357,105 @@ than on every keystroke, and re-read each time the panel opens — so editing th
 editor works, and does not lose whatever the panel had. Only `expanded` is a meaningful placement;
 the collapsed strip has no room to type.
 
+### calendar
+
+What is left of today. Opt-in, and it reads your calendar — that is a thing to be asked for rather
+than found.
+
+| Key | Accepts | Default |
+|---|---|---|
+| `calendar-placement` | `leading` \| `trailing` \| `expanded` | `expanded` |
+| `calendar-alert` | duration \| `never` | `5m` |
+| `calendar-include` | calendar names, comma-separated | every calendar |
+| `calendar-24-hour` | `true` \| `false` | `false` |
+
+```ini
+widget = calendar
+```
+
+The open panel shows the rest of the day as an agenda: a colour bar from the event's calendar, the
+time, the title, and — on the next event only — how long until it. A meeting with a link to join
+gets a button to join it; clicking anywhere else on the row opens the event in Calendar.
+
+```
+▏10:30   Standup                              in 5m  ⏵
+▏11:00   Design review · Zoom                        ⏵
+▏14:00   1:1 with Sam
+```
+
+**How many rows appear is decided by how tall the panel is**, not by a setting — three at the
+default `expanded-height`, more if you raise it. The panel already has one number for its height,
+and a second one that had to agree with it is a second one that can disagree with it.
+
+The countdown appears only inside the last hour. Before that the clock time says more: `in 3h` is
+not a countdown, it is the time written badly.
+
+Three rules that are not settings:
+
+- **All-day events** head the list and are never the next event, never counted down to, and never
+  announced. There is no moment to count down *to*, and a conference occupying that slot would say
+  nothing for eight hours.
+- **Declined and cancelled events do not appear at all.** Counting down at you toward a meeting you
+  said no to is worse than showing you nothing.
+- **The horizon is the end of today.** An empty evening says `Nothing left today` and the strip goes
+  dark, rather than showing you tomorrow's nine o'clock all night.
+
+#### Announcements
+
+`calendar-alert` is how far ahead a meeting is announced — the notch briefly enlarging to name it,
+then reverting. Once per meeting, and never for one already under way.
+
+```ini
+calendar-alert = 10m     # or `never`
+```
+
+This is the reason the widget can be worth having on a machine you already get notifications on:
+it appears where your eyes are rather than in a corner you have trained yourself to ignore.
+
+Unlike most widgets, calendar keeps working while the notch is closed — it has to, because an
+announcement cannot be made by something that is not watching. That costs one change observer and
+one task asleep until the next event boundary; nothing polls. With `calendar-alert = never` there
+is nothing to watch for, and it stops running behind a closed notch entirely.
+
+#### In the collapsed strip
+
+```ini
+collapsed-bleed = 90
+widget = calendar
+calendar-placement = trailing
+```
+
+One line, the next event only, with the title truncated to whatever room the bleed leaves. It is a
+readout and not a control: clicks pass through it to the notch, so clicking still opens the panel.
+
+#### Which calendars
+
+By default, all of them. `calendar-include` narrows that by name:
+
+```ini
+calendar-include = Work, Team
+```
+
+A name matching no calendar is reported and shows nothing. perch will not quietly widen a filter
+you wrote on purpose — `Wrok` should leave you with an empty panel and a line explaining it, not
+with your personal calendar on the bezel.
+
+#### Access
+
+macOS asks the first time the widget draws, and perch asks for nothing until then: no
+`widget = calendar` in your config means no prompt, ever. What macOS calls "full access" is what
+reading events requires — the narrower write-only grant cannot read them. perch never writes.
+
+Refusing is an ordinary outcome, not a failure. The panel says where to change your mind and
+everything else keeps working:
+
+```
+Calendar access is off — System Settings › Privacy & Security › Calendars
+```
+
+Granting it later applies immediately; there is no relaunch. Events are read locally and never
+leave the machine.
+
 ## Only one perch
 
 perch takes an exclusive lock on `perch.lock` in its config directory at startup. A second copy

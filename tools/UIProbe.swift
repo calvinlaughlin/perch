@@ -615,6 +615,81 @@ scenario(
 }
 
 scenario(
+    "calendar is opt-in",
+    config: """
+        open-on = never
+        collapsed-bleed = 90
+        """
+) { app in
+    // Passive, and it can be: with no `widget = calendar` the widget is never built, so nothing of
+    // it exists in the tree whether the notch is open or shut. The permission follows the same
+    // line — a perch nobody asked for a calendar never asks the system for one.
+    check(
+        element(withIdentifier: "calendar.container", in: app) == nil,
+        "no agenda appears without being asked for"
+    )
+    check(
+        element(withIdentifier: "calendar.strip", in: app) == nil,
+        "and nothing of it reaches the collapsed strip either"
+    )
+}
+
+scenario(
+    "calendar when asked for",
+    interaction: .driving,
+    config: """
+        open-on = hover
+        widget = calendar
+        """
+) { app in
+    // Driving, because the agenda only draws in the open panel. What is asserted is the card, not
+    // its contents: the machine running this has whatever is in its own calendar, and an assertion
+    // about a meeting that has to exist is one that fails at the weekend.
+    movePointer(to: onTheNotch)
+    wait(2.5)
+
+    check(panelIsOpen(app), "the panel opened, so what is below is what perch drew")
+    check(
+        element(withIdentifier: "calendar.container", in: app) != nil,
+        "declaring it puts the agenda in the panel"
+    )
+
+    // One of these three is always true once access is settled, and exactly one of them: rows, an
+    // empty day, or a refusal. None of them means the card drew nothing at all, which is what a
+    // widget that failed to build looks like.
+    let states = ["calendar.row.0.title", "calendar.empty", "calendar.denied"]
+    let present = states.filter { element(withIdentifier: $0, in: app) != nil }
+    check(present.count == 1, "the card says exactly one thing: \(present)")
+
+    if let denied = element(withIdentifier: "calendar.denied", in: app) {
+        _ = denied
+        print("  note: no calendar access — grant it to exercise the agenda itself")
+    }
+
+    movePointer(to: parkingSpot)
+}
+
+scenario(
+    "a calendar setting perch cannot parse",
+    config: """
+        open-on = never
+        collapsed-bleed = 90
+        widget = calendar
+        widget = clock
+        calendar-alert = soonish
+        clock-placement = trailing
+        """
+) { app in
+    // The config system's promise, applied to the newest widget: one bad line is reported and
+    // skipped, and everything else still loads. A widget that threw its way out of the panel would
+    // take the clock beside it down too.
+    check(
+        element(withIdentifier: "clock.time", in: app) != nil,
+        "a bad calendar setting does not take the other widgets with it"
+    )
+}
+
+scenario(
     "notes is opt-in",
     interaction: .driving,
     config: """
